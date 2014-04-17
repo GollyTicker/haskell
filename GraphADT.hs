@@ -5,11 +5,11 @@
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M (empty, fromList, toList,
                                        union, lookup, keysSet,
-                                       fromSet, elems)
+                                       fromSet)
 import Data.Tuple (swap) -- wtf, why is this not in Prelude?!
 import Data.Maybe (fromJust)
 import Data.Set (Set)
-import qualified Data.Set as S (map, union)
+import qualified Data.Set as S (findMax, insert, mapMonotonic)
 
 -- Use -Wall plase.
 
@@ -60,8 +60,7 @@ instance (Show i, Show a) => Show (Graph i a) where
     show gr = "Graph" ++ showGraphVertices gr ++ showGraphEdges gr
 ;
 
-
-
+nl, indent :: String
 nl = "\n"
 indent = "    "
 
@@ -93,11 +92,11 @@ showEdge ((from, to), i) = show from ++ " -> " ++ show to ++ " | " ++ show i
 -- because the order of the vertices isnt specified, both possibilities have to be tried out.
 -- we assume, that inbetween any two vertices an edge exist.
 -- the U in the getU stands for Undirected access
-unsafeGetU :: Edges i -> (Vertex, Vertex) -> i
+unsafeGetU :: Eq i => Edges i -> (Vertex, Vertex) -> i
 unsafeGetU w vs = fromJust $ getU w vs
 ;
 
-getU :: Edges i -> (Vertex, Vertex) -> Maybe i
+getU :: Eq i => Edges i -> (Vertex, Vertex) -> Maybe i
 getU w vs
         | a == Nothing = b
         | otherwise = a
@@ -105,12 +104,16 @@ getU w vs
           b = getD w (swap vs)
 ;
 
-getD :: Edges i -> (Vertex, Vertex) -> Maybe i
+getD :: Eq i => Edges i -> (Vertex, Vertex) -> Maybe i
 getD w vs = M.lookup vs w
 -- ============================================================
 
 
 
+mkNewVertice :: Set Vertex -> Vertex
+mkNewVertice vs = {- restructure $ -}1 + S.findMax vs
+-- TODO: graph might fail if an index already is at the Int maximum.
+-- duplicated at the minimum Int will appear then!
 
 -- =====================================================================================
 
@@ -121,16 +124,17 @@ buildK 1 = Graph {
                     vertices = M.fromList [(1,())],
                     edges = M.empty
                  }
-buildK n = let g' = buildK n'
-               n' = n-1
-               newEdges = M.fromSet withVoid $ newVertices
-               newVertices = S.map add . allV $ g'
-               withVoid = const ()
-               verticesMap = M.fromSet withVoid S.union (vertices g') newVertices
-               add v = (n', v) -- connect the new vertice to every other
+buildK n = let g' = buildK (n - 1)
+               oldVertices = allV g'
+               setToMap = M.fromSet (const ())
+               newEdges = setToMap . S.mapMonotonic f $ oldVertices
+               f v = (n, v)
+               newVertices = setToMap $ mkNewVertice oldVertices `S.insert` oldVertices
+               verticesMap = (M.union newVertices (vertices g'))
+               edgesMap = (M.union newEdges (edges g'))
            in Graph {
                     vertices = verticesMap,
-                    edges = (M.union newEdges (edges g'))  -- ad the new edges and the new vertice to the graph
+                    edges = edgesMap
                     }
 ;
 -- ghci> buildK 4

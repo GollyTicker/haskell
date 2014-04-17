@@ -1,0 +1,9 @@
+#gerichtet
+Quelle,X1,5
+Quelle,X2,5
+X1,X2,3
+X2,X3,11
+X3,X1,6
+X1,Senke,7
+X2,Senke,4
+X3,Senke,4

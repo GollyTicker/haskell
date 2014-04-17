@@ -1,0 +1,11 @@
+#ungerichtet
+v,w,8
+v,x,6
+v,y,4
+v,z,2
+w,x,9
+w,y,9
+w,z,9
+x,y,9
+x,z,7
+y,z,5

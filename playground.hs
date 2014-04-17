@@ -5,7 +5,7 @@ import Data.Map.Strict as M (fromList)
 
 -- http://en.wikipedia.org/wiki/Ant_colony_optimization_algorithms#Overview
 
-{- graph30.graph
+{- 30-TSPsimple.graph
 #ungerichtet
 A,B,5
 A,C,10

@@ -1,0 +1,9 @@
+#ungerichtet
+x,y,1
+y,z,1
+z,w,1
+w,u,1
+u,z,1
+z,x,1
+x,w,1
+y,u,1

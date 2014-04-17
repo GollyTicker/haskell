@@ -1,0 +1,16 @@
+#ungerichtet
+a,b,1
+a,c,1
+a,g,1
+d,i,1
+f,i,1
+h,a,1
+b,c,1
+c,d,1
+d,e,1
+d,g,1
+h,g,1
+g,c,1
+i,e,1
+f,g,1
+g,i,1

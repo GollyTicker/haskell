@@ -5,7 +5,7 @@
 import Data.Map.Strict as M (fromList, union, Map, toList, empty, (!), lookup)
 import Data.Ord (comparing)
 import Data.List (minimumBy, permutations, intercalate)
-import Data.Maybe (catMaybes)
+import Data.Maybe (fromJust)
 import Data.Tuple (swap)
 
 {- graph30.graph
@@ -93,19 +93,27 @@ bruteForceTSP gr =
 -- because the order of the vertices isnt specified, both possibilities have to be tried out.
 -- we assume, that inbetween any two vertices an edge exist.
 -- the U in the getU standt for Undirected access
-get :: WEdges -> (Vertex, Vertex) -> Weight
-get w vs = head $ catMaybes [mweight, mweight'] -- take the first working one
-        where
-            mweight = M.lookup vs w
-            mweight' = M.lookup (swap vs) w
+unsafeGetU :: WEdges -> (Vertex, Vertex) -> Weight
+unsafeGetU w vs = fromJust $ getU w vs
 ;
+
+getU :: WEdges -> (Vertex, Vertex) -> Maybe Weight
+getU w vs
+        | a == Nothing = b
+        | otherwise = a
+    where a = getD w vs
+          b = getD w (swap vs)
+;
+
+getD :: WEdges -> (Vertex, Vertex) -> Maybe Weight
+getD w vs = M.lookup vs w
 
 -- given weights, it calculates the round trip cost for the given route.
 -- it returns the route and its cost
 tripCost :: WEdges -> [Vertex] -> ([Vertex], Int)
 tripCost weights vs = (vs, cost)
             where
-                cost = sum $ map (get weights) csec
+                cost = sum $ map (unsafeGetU weights) csec
                 -- ConsSECutive vertices
                 csec :: [(Vertex,Vertex)]
                 csec = take (length vs) $ zip cvs (tail cvs)

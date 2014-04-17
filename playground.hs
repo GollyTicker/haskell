@@ -1,6 +1,6 @@
 
 import Graf
-
+import Data.Map.Strict as M (fromList)
 
 
 -- http://en.wikipedia.org/wiki/Ant_colony_optimization_algorithms#Overview
@@ -19,7 +19,7 @@ C,E,30
 D,E,50
 -}
 
-myGraph :: Graph () Int
+myGraph :: Graph Int ()
 myGraph = empty `withEdgeMap` myWeightedMap -- graph30 from GKA -- 0 to 4 stands for A to E
 myWeightedMap :: Edges Int
 myWeightedMap = M.fromList $ zip

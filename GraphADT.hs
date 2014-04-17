@@ -40,6 +40,8 @@ Graph
 
 -- i is the labeling of edges.
 -- a is the labeling of vertices
+
+-- EXPORTED
 data Graph i a = Graph {
                     vertices :: Vertices a,
                     edges :: Edges i
@@ -49,9 +51,11 @@ type Vertices a = Map Vertex a
 type Edge = (Vertex, Vertex)
 type Edges i = Map Edge i    -- weighted Edges
 
+-- EXPORTED
 allV :: Graph i a -> Set Vertex
 allV = M.keysSet . vertices
 
+-- EXPORTED
 allE :: Graph i a -> Set Edge
 allE = M.keysSet . edges
 ;
@@ -92,11 +96,13 @@ showEdge ((from, to), i) = show from ++ " -> " ++ show to ++ " | " ++ show i
 -- because the order of the vertices isnt specified, both possibilities have to be tried out.
 -- we assume, that inbetween any two vertices an edge exist.
 -- the U in the getU stands for Undirected access
+-- EXPORTED
 unsafeGetU :: Eq i => Edges i -> (Vertex, Vertex) -> i
 unsafeGetU w vs = fromJust $ getU w vs
 ;
 
-getU :: Eq i => Edges i -> (Vertex, Vertex) -> Maybe i
+-- EXPORTED
+getU :: Eq i => Edges i -> Edge -> Maybe i
 getU w vs
         | a == Nothing = b
         | otherwise = a
@@ -104,9 +110,12 @@ getU w vs
           b = getD w (swap vs)
 ;
 
-getD :: Eq i => Edges i -> (Vertex, Vertex) -> Maybe i
+-- EXPORTED
+getD :: Eq i => Edges i -> Edge -> Maybe i
 getD w vs = M.lookup vs w
 -- ============================================================
+
+-- EXPORTED
 
 
 
@@ -118,7 +127,8 @@ mkNewVertice vs = {- restructure $ -}1 + S.findMax vs
 -- =====================================================================================
 
 -- buildK n builds the K n graph. it is a graph with n edges. each connected to every other
--- warpup. build Kn graphs to see whether the primitive graph implementation works.
+-- warmup. build Kn graphs to see whether the primitive graph implementation works.
+-- EXPORTED
 buildK :: Vertex -> Graph () ()
 buildK 1 = Graph {
                     vertices = M.fromList [(1,())],

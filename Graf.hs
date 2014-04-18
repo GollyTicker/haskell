@@ -130,7 +130,7 @@ labelU w vs
 -- EXPORTED
 {-
 Returns the labeling of the given edge of a Map of Edges.
-REturns Nothing if it fails.
+Returns Nothing if it fails.
 -}
 labelD :: Eq i => Edges i -> Edge -> Maybe i
 labelD w vs = M.lookup vs w
@@ -141,13 +141,17 @@ labelD w vs = M.lookup vs w
 -- we assume, that inbetween any two vertices an edge exist.
 -- the U in the labelU stands for Undirected access
 -- EXPORTED
-unsafeLabelU :: Eq i => Edges i -> (Vertex, Vertex) -> i
+{-
+Gets the label of an Edge in the edges of an undirected Graph.
+It should only be used, if one is sure, that the edge really exists.
+-}
+unsafeLabelU :: Eq i => Edges i -> Edge -> i
 unsafeLabelU w vs = fromJust $ labelU w vs
 ;
 
 -- ============================================================
 
-
+-- used to make a new Vertice for a given Set of used Vertices.
 mkNewVertice :: Set Vertex -> Vertex
 mkNewVertice vs
         | S.null vs = 1
@@ -160,9 +164,11 @@ mkNewVertice vs
 -- buildK n builds the K n graph. it is a graph with n edges. each connected to every other
 -- warmup. build Kn graphs to see whether the primitive graph implementation works.
 -- EXPORTED
+{-
+Returns K(n) for non-negative n.
+-}
 buildK :: Vertex -> Graph () ()
--- TODO: add empty graph here
-buildK n | n < 0 = error $ "buildK: negative VertexNumber " ++ show n
+buildK n | n < 0 = error $ "buildK: negative Vertex# " ++ show n
 buildK 0 = empty
 buildK n = let g' = buildK (n - 1)
                oldVertices = allV g'
@@ -177,9 +183,14 @@ buildK n = let g' = buildK (n - 1)
                     }
 ;
 -- UTIL
+{-
+Adds non-information to a set to make a map.
+-}
 setToMap :: Set a -> Map a ()
 setToMap = M.fromSet (const ())
-
+{-
+Same a setToMap for lists.
+-}
 listToMap :: Ord a => [a] -> Map a ()
 listToMap = M.fromList . map (\x -> (x, ()))
 
@@ -189,6 +200,10 @@ listToMap = M.fromList . map (\x -> (x, ()))
 -- a vertice is only incident with ittselfs,
 -- if theres a "Schlinge" on it.
 -- EXPORTED
+{-
+For an Vertice and an Graph this function returns the
+edges its connected with and the adjacent vertices.
+-}
 incident :: Vertex -> Graph i a -> (Set Vertex, Set Edge)
 incident v gr = asTuple . S.map g . S.filter f . M.keysSet . edges $ gr
         where
@@ -205,23 +220,39 @@ asTuple = S.foldr step (S.empty, S.empty)
 ;
 
 -- EXPORTED
+{-
+Returns all vertices this vertice is connected with.
+The graph is interpreted as an undirected graph.
+-}
 adjacent :: Vertex -> Graph i a -> Set Vertex
 adjacent = fst `dot` incident
 
 -- EXPORTED
+{-
+Build a new Graph from labeled Edge.
+-}
 fromLabels :: Edges i -> Graph i ()
 fromLabels = (empty `withEdgeMap`)
 -- make graph with multiples uses of `with`
 
 -- EXPORTED
+{-
+Build a new Graph from labelless edges.
+-}
 fromEdgeList :: [Edge] -> Graph () ()
 fromEdgeList es = fromLabels . listToMap $ es
 
 -- EXPORTED
+{-
+Build a new Graph from named Vertices.
+-}
 fromNames :: Vertices a -> Graph () a
 fromNames = (empty `withVerticeMap`)
 
 -- EXPORTED
+{-
+Adds Edges to a labelless and nameless Graph.
+-}
 addEdges :: Graph () () -> [Edge] -> Graph () ()
 addEdges gr es = uptEdges . listToMap $ es
         where
@@ -238,6 +269,9 @@ withVoidVertices gr = let newVertices = M.union (vertices gr) (getVertices $ edg
                       in gr {vertices = newVertices}
 
 -- EXPORTED
+{-
+Returns a new Graph with the same vertices but the new given edges.
+-}
 withEdgeMap :: Graph j () -> Edges i -> Graph i ()
 withEdgeMap gr edgemap = withVoidVertices . uptEdges $ gr
         where
@@ -245,30 +279,41 @@ withEdgeMap gr edgemap = withVoidVertices . uptEdges $ gr
 ;
 
 -- EXPORTED
+{-
+Returns a new Graph where the new named vertices are used instead.
+The edges are left untouched.
+-}
 withVerticeMap :: Graph i a -> Vertices b -> Graph i b
 withVerticeMap gr vmap = gr {vertices = vmap}
 
 -- EXPORTED
+{-
+Change the label of edges by their indices and old labels
+-}
 mapE :: (Edge -> i -> j) -> Graph i a -> Graph j a
 mapE f x = x {edges = M.mapWithKey f (edges x)}
+
 -- EXPORTED
+{-
+Change the name of vertices by their indices and old names.
+-}
 mapV :: (Vertex -> a -> b) -> Graph i a -> Graph i b
 mapV f x = x {vertices = M.mapWithKey f (vertices x)}
 -- EXPORTED
+{-
+Combines mapV and mapV into a single map.
+-}
 mapBi :: (Edge -> i -> j) -> (Vertex -> a -> b) -> Graph i a -> Graph j b
 mapBi f g = mapV g . mapE f
-
-
--- Notes:
--- maybe use some tracker to trace inconsistent graphs and force the usage of "restructure" to make them accissible again?
-
 
 -- ======================    SHOW     ==========================
 nl, indent :: String
 nl = "\n"
 indent = "    "
 showGraph :: (Show a, Show i) => Graph i a -> String
-showGraph gr = "Graph"
+showGraph gr = "Graph "
+                ++ "|V| = " ++ show (sizeV gr) ++ ", "
+                ++ "|E| = " ++ show (sizeE gr)
                 ++ showWith (Right ()) gr   -- show vertices
                 ++ showWith (Left ()) gr    -- show edges
 ;
@@ -290,6 +335,10 @@ showEdge ((from, to), i) = show from ++ " -> " ++ show to ++ " | " ++ show i
 
 -- parses Graph files like from GKA
 -- EXPORTED
+{-
+Parse a Graph from a InputFile String.
+Returns a ParseError or a Parsed Graph.
+-}
 fromString :: String -> Either String (Graph String String) -- not yet types i and a.
 fromString = undefined      -- should be using Parsec!
 

@@ -5,7 +5,7 @@ module Graf
     Vertices, Edges, -- type synonyms for label/names maps
     vertices, edges, allV, allE,    -- simple accessors
     allVlist, allElist,
-    nameOf, unsafeNameOf,
+    nameOf, unsafeNameOf, fname,
     labelU, labelD, unsafeLabelU,     --  label access
     buildK,
     mapE, mapV, mapBi,
@@ -28,7 +28,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M (empty, toList, union,
                                        lookup, keysSet, fromSet,
                                        null, keys, mapWithKey,
-                                       fromList)
+                                       fromList, insert)
 import Data.Tuple (swap) -- wtf, why is this not in Prelude?!
 import Data.Maybe (fromJust)
 import Data.Set (Set)
@@ -146,6 +146,14 @@ Returns Nothing if it fails.
 labelD :: Eq i => Edges i -> Edge -> Maybe i
 labelD = flip M.lookup
 
+-- EXPORTED
+{-
+Applies a function to a named verrtice.
+-}
+fname :: (a -> a) -> Vertex -> Graph i a -> Graph i a
+fname f v gr = gr {vertices = vs'}
+        where vs' = M.insert v (f x) $ vertices gr
+              x = unsafeNameOf (vertices gr) v
 
 -- for given weights, get the weigth inbetween the given vertices.
 -- because the order of the vertices isnt specified, both possibilities have to be tried out.

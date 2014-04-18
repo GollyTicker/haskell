@@ -18,10 +18,9 @@ C,E,30
 D,E,50
 -}
 
-myGraph :: Graph Int ()
-myGraph = empty `withEdgeMap` myWeightedMap -- graph30 from GKA -- 0 to 4 stands for A to E
-myWeightedMap :: Edges Int
-myWeightedMap = M.fromList $ zip
+myGraph :: Graph Int ()         -- graph30 from GKA -- 0 to 4 stands for A to E
+myGraph = fromLabels $ M.fromList $
+                    zip
                         (zip
                             [0,0,0,0,1,1,1,2,2,3]   -- erste spalte
                             [1,2,3,4,2,3,4,3,4,4]   -- zweite spalte

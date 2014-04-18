@@ -8,7 +8,7 @@ module Graf
     buildK,
     empty, null,
     sizeV, sizeE,
-    asLabledGraph, withEdgeMap,
+    fromLabels, withEdgeMap,
     fromString
    )
     where
@@ -157,8 +157,8 @@ setToMap = M.fromSet (const ())
 -- ================================================================
 
 -- EXPORTED
-asLabledGraph :: Edges i -> Graph i ()
-asLabledGraph = (empty `withEdgeMap`)
+fromLabels :: Edges i -> Graph i ()
+fromLabels = (empty `withEdgeMap`)
 -- make graph with multiples uses of `with`
 
 -- given a possibly inconsistent graph where

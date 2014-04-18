@@ -10,17 +10,23 @@ module Graf
     mapE, mapV, mapBi,
     empty, null,
     sizeV, sizeE,
-    adjacent, inzident,
+    adjacent, incident,
     fromLabels, withEdgeMap,
     fromNames, withVerticeMap,
+    fromEdgeList, addEdges,
     fromString
    )
     where
+;
+
+-- TODO: documentation of functions
+-- testing of functions
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M (empty, toList, union,
                                        lookup, keysSet, fromSet,
-                                       null, keys, mapWithKey)
+                                       null, keys, mapWithKey,
+                                       fromList)
 import Data.Tuple (swap) -- wtf, why is this not in Prelude?!
 import Data.Maybe (fromJust)
 import Data.Set (Set)
@@ -30,43 +36,22 @@ import qualified Data.Set as S (findMax, insert, mapMonotonic,
                                 foldr, empty, insert)
 ;
 import Prelude hiding (null)
+
 -- Use -Wall plase.
 
 -- util. See "(f .) . g" on stackexchange haskell
+dot :: (b -> c) -> (a1 -> a2 -> b) -> a1 -> a2 -> c
 dot = (.) . (.)
 -- Example:
 -- concatMap f ls = concat . map f $ ls
 -- concatMap f = concat . map f
 -- concatMap = concat `dot` map
 
-{-
-Usage:
-*Main> print myGraph
-Graph
-    0 -> 1 (5),
-    0 -> 2 (10),
-    0 -> 3 (15),
-    0 -> 4 (20),
-    1 -> 2 (35),
-    1 -> 3 (40),
-    1 -> 4 (45),
-    2 -> 3 (25),
-    2 -> 4 (30),
-    3 -> 4 (50)
-*Main> bruteForceTSP myGraph
-([2,3,1,0,4],120)
-
-
--}
-
-
-
--- only need fully connected graphs
--- no need to take care of any graph where not every vertie is connected to every other vertice.
 
 -- i is the labeling of edges.
 -- a is the naming of vertices.
 -- information on edges are called labels and on vertices names.
+-- no support of multigraphs
 
 -- EXPORTED
 data Graph i a = Graph {
@@ -79,12 +64,18 @@ type Edge = (Vertex, Vertex)
 type Edges i = Map Edge i    -- weighted Edges
 
 -- EXPORTED
+{-
+Returns a Set/List of the Vertices of the graph.
+-}
 allV :: Graph i a -> Set Vertex
 allV = M.keysSet . vertices
 allVlist :: Graph i a -> [Vertex]
 allVlist = M.keys . vertices
 
 -- EXPORTED
+{-
+Returns a Set/List of the Edges of the graph.
+-}
 allE :: Graph i a -> Set Edge
 allE = M.keysSet . edges
 allElist :: Graph i a -> [Edge]
@@ -92,6 +83,9 @@ allElist = M.keys . edges
 
 
 -- EXPORTED
+{-
+the empty Graph.
+-}
 empty :: Graph () ()
 empty = Graph {
                 vertices = M.empty,
@@ -99,18 +93,47 @@ empty = Graph {
             }
 ;
 
+{-
+Returns the number of vertices/edges in the graph.
+-}
 sizeV :: Graph i a -> Int
 sizeV = S.size . allV
 sizeE :: Graph i a -> Int
 sizeE = S.size . allE
 
 -- EXPORTED
+{-
+Is the graph empty?
+-}
 null :: Graph a i -> Bool
 null g = M.null (vertices g) && M.null (edges g)
 
 instance (Show i, Show a) => Show (Graph i a) where
     show = showGraph
 ;
+
+
+
+-- EXPORTED
+{-
+Accesses an undirected Edge and returns its contents.
+Returns Nothing if no edge was found.
+-}
+labelU :: Eq i => Edges i -> Edge -> Maybe i
+labelU w vs
+        | a == Nothing = b
+        | otherwise = a
+    where a = labelD w vs
+          b = labelD w (swap vs)
+;
+
+-- EXPORTED
+{-
+Returns the labeling of the given edge of a Map of Edges.
+REturns Nothing if it fails.
+-}
+labelD :: Eq i => Edges i -> Edge -> Maybe i
+labelD w vs = M.lookup vs w
 
 
 -- for given weights, get the weigth inbetween the given vertices.
@@ -122,18 +145,6 @@ unsafeLabelU :: Eq i => Edges i -> (Vertex, Vertex) -> i
 unsafeLabelU w vs = fromJust $ labelU w vs
 ;
 
--- EXPORTED
-labelU :: Eq i => Edges i -> Edge -> Maybe i
-labelU w vs
-        | a == Nothing = b
-        | otherwise = a
-    where a = labelD w vs
-          b = labelD w (swap vs)
-;
-
--- EXPORTED
-labelD :: Eq i => Edges i -> Edge -> Maybe i
-labelD w vs = M.lookup vs w
 -- ============================================================
 
 
@@ -169,38 +180,54 @@ buildK n = let g' = buildK (n - 1)
 setToMap :: Set a -> Map a ()
 setToMap = M.fromSet (const ())
 
+listToMap :: Ord a => [a] -> Map a ()
+listToMap = M.fromList . map (\x -> (x, ()))
+
 -- ================================================================
 
 -- incident returns Sets of incident vertices and Edges.
 -- a vertice is only incident with ittselfs,
 -- if theres a "Schlinge" on it.
-incident :: Graph i a -> Vertex -> (Set Vertex, Set Edge)
-incident gr v = asTuple . S.map g . S.filter f . M.keysSet . edges $ gr
+-- EXPORTED
+incident :: Vertex -> Graph i a -> (Set Vertex, Set Edge)
+incident v gr = asTuple . S.map g . S.filter f . M.keysSet . edges $ gr
         where
-            asTuple :: Set (Vertex, Edge)
-            asTuple = S.foldr step (S.empty, S.empty)
-                    where
-                        step (v,e) (vs,es) = (S.insert v vs, S.insert e es)
-            g :: Edge -> (Vertex, Edge)
             g edge@(from, to)
                 | from == v = (to, edge)
                 | to == v = (from, edge)
                 | otherwise = error "incident. filter false."
-            f :: Edge -> Bool
             f (from, to) = from == v || to == v
+;
+asTuple :: Set (Vertex, Edge) -> (Set Vertex, Set Edge)
+asTuple = S.foldr step (S.empty, S.empty)
+        where
+            step (v,e) (vs,es) = (S.insert v vs, S.insert e es)
+;
 
-adjacent :: Graph i a -> Vertex -> Set Vertex
-adjacent gr v = fst `dot` incident
+-- EXPORTED
+adjacent :: Vertex -> Graph i a -> Set Vertex
+adjacent = fst `dot` incident
 
 -- EXPORTED
 fromLabels :: Edges i -> Graph i ()
 fromLabels = (empty `withEdgeMap`)
 -- make graph with multiples uses of `with`
 
+-- EXPORTED
+fromEdgeList :: [Edge] -> Graph () ()
+fromEdgeList es = fromLabels . listToMap $ es
 
 -- EXPORTED
 fromNames :: Vertices a -> Graph () a
 fromNames = (empty `withVerticeMap`)
+
+-- EXPORTED
+addEdges :: Graph () () -> [Edge] -> Graph () ()
+addEdges gr es = uptEdges . listToMap $ es
+        where
+            uptEdges em = gr {edges = M.union em (edges gr)}
+
+-- the with operations overwrite the old contents.
 
 -- given a possibly inconsistent graph where
 -- there might be vertices in the edgeMap which dont appear in the vertices

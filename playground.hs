@@ -55,8 +55,14 @@ Graph
 ([1,2,3,0,4],210)
 -}
 
+-- ohne mittlere diagonale
+hausDesNikolaus = fromEdgeList $ zip
+                                    [0,0,0,1,2,3]
+                                    [1,3,4,2,3,4]
+;
 
-
+-- mit mittlerer Diagonale
+hausDesNikolaus' = hausDesNikolaus `addEdges` [(2,0), (3,1)]
 
 
 -- its assumed that all vertices are indeed connected. this is not checked!

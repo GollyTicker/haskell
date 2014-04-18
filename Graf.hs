@@ -5,12 +5,14 @@ module Graf
     Vertices, Edges, -- type synonyms for label/names maps
     vertices, edges, allV, allE,    -- simple accessors
     allVlist, allElist,
+    nameOf, unsafeNameOf,
     labelU, labelD, unsafeLabelU,     --  label access
     buildK,
     mapE, mapV, mapBi,
     empty, null,
     sizeV, sizeE,
     adjacent, incident,
+    outgoing, incoming,
     fromLabels, withEdgeMap,
     fromNames, withVerticeMap,
     fromEdgeList, addEdges,
@@ -113,6 +115,15 @@ instance (Show i, Show a) => Show (Graph i a) where
 ;
 
 
+-- EXPORTED
+{-
+Functions to access names of vertices
+-}
+unsafeNameOf :: Vertices a -> Vertex -> a
+unsafeNameOf = fromJust `dot` nameOf
+
+nameOf :: Vertices a -> Vertex-> Maybe a
+nameOf = flip M.lookup
 
 -- EXPORTED
 {-
@@ -120,11 +131,11 @@ Accesses an undirected Edge and returns its contents.
 Returns Nothing if no edge was found.
 -}
 labelU :: Eq i => Edges i -> Edge -> Maybe i
-labelU w vs
+labelU w e
         | a == Nothing = b
         | otherwise = a
-    where a = labelD w vs
-          b = labelD w (swap vs)
+    where a = labelD w e
+          b = labelD w (swap e)
 ;
 
 -- EXPORTED
@@ -133,7 +144,7 @@ Returns the labeling of the given edge of a Map of Edges.
 Returns Nothing if it fails.
 -}
 labelD :: Eq i => Edges i -> Edge -> Maybe i
-labelD w vs = M.lookup vs w
+labelD = flip M.lookup
 
 
 -- for given weights, get the weigth inbetween the given vertices.
@@ -146,7 +157,7 @@ Gets the label of an Edge in the edges of an undirected Graph.
 It should only be used, if one is sure, that the edge really exists.
 -}
 unsafeLabelU :: Eq i => Edges i -> Edge -> i
-unsafeLabelU w vs = fromJust $ labelU w vs
+unsafeLabelU = fromJust `dot` labelU
 ;
 
 -- ============================================================
@@ -227,6 +238,24 @@ The graph is interpreted as an undirected graph.
 adjacent :: Vertex -> Graph i a -> Set Vertex
 adjacent = fst `dot` incident
 
+-- EXPORTED
+{-
+Returns all the outgoing vertices and edges for this vertex.
+-}
+outgoing :: Vertex -> Graph i a -> (Set Vertex, Set Edge)
+outgoing v gr = let es = S.filter ((v==) . fst) . snd . incident v $ gr
+                    vs = S.map snd es
+                in (vs, es)
+;
+
+-- EXPORTED
+{-
+Returns all the outgoing vertices and edges for this vertex.
+-}
+incoming :: Vertex -> Graph i a -> (Set Vertex, Set Edge)
+incoming v gr = let es = S.filter ((v==) . snd) . snd . incident v $ gr
+                    vs = S.map fst es
+                in (vs, es)
 -- EXPORTED
 {-
 Build a new Graph from labeled Edge.

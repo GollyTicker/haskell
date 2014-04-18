@@ -320,8 +320,8 @@ showGraph gr = "Graph "
 
 showWith :: (Show i, Show a) => Either () () -> Graph i a -> String
 showWith choice gr = concat
-                     -- TODO: add alphabetical sorting here
                      . map ((nl ++ indent) ++)
+                     -- TODO: add alphabetical sorting here
                      . either caseEdges caseVertices
                      $ choice
         where

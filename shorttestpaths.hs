@@ -1,34 +1,45 @@
 
 
 
--- Djikstra, A*, BellmanFord etc..
+import Graf
+import Data.Map.Strict as M (fromList)
 
-{-
-1  function Dijkstra(Graph, source):
 
-       1. initialize each vertex with
-                dist(v) = INF
-                pred(v) = nil                                      // from source
- 7      
- 8      2. dist(src) := 0
- 9      let Q = vertices Graph
-10      
-11      while Q is not empty:                                      // The main loop
-12          let u = minimumBy (comparing dist) Q
-            Q <- delete u Q
-14          
-            if dist(u) == INF then break while
-17          
-18          for each neighbor v of u:                              // where v has not yet been                                                 // removed from Q.
-20              alt := dist[u] + dist_between(u, v) ;
-21              if alt < dist[v]:                                  // Relax (u,v,a)
-22                  dist[v]  := alt ;
-23                  previous[v]  := u ;
-24                  decrease-key v in Q;                           // Reorder v in the Queue (that is, heapify-down) 
-25              end if
-26          end for
-27      end while
-28      return dist[], previous[];
-29  end function
 
--}
+-- shortestPaths :: (Bounded i, Num i, Ord i) => Graph i a -> Vertex -> Graph (i, Maybe Vertex) a
+-- shortestPaths :: Vertex -> Graph Int a -> Graph (Int, Maybe Vertex) a
+shortestPaths source gr = resGraph
+        where
+            resGraph = step initGraph
+            initGraph = mapV initialize gr
+            -- (Entf, Vorg, OK, a)
+            -- Right in Entf represents an infinite distance
+            initialize v a
+                    | v == source = (Left 0, v, False, a)
+                    | otherwise = (Right (), v, False, a)
+;
+
+step :: Graph Int (Either Int (), Int, Bool, a) -> Graph Int (Either Int (), Int, Bool, a)
+step gr = res
+    where
+        res = relaxed   -- TODO: add loop end
+        relaxed = relaxEdges inspectedH
+        relaxEdges gr' = foldr f gr' candidates
+                where
+                    candidates
+        h = minDistUninspected gr
+        inspectedH = mapV (\v x@(dist,pred,ok,a) -> if v==h then (dist, pred, True, a) else x) gr
+        
+
+
+myGraph :: Graph Int ()         -- graph30 from GKA -- 0 to 4 stands for A to E
+myGraph = fromLabels $ M.fromList $
+                    zip
+                        (zip
+                            [0,0,0,0,1,1,1,2,2,3]   -- erste spalte
+                            [1,2,3,4,2,3,4,3,4,4]   -- zweite spalte
+                        )
+                        [5,10,15,20,35,40,45,25,30,50]  -- gewichtungsspalte
+;
+
+

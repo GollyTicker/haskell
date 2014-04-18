@@ -3,7 +3,7 @@
 
 import Graf
 import Data.Map.Strict as M (fromList)
-
+import Data.Set as S (Set, foldr, filter)
 
 
 -- shortestPaths :: (Bounded i, Num i, Ord i) => Graph i a -> Vertex -> Graph (i, Maybe Vertex) a
@@ -19,15 +19,25 @@ shortestPaths source gr = resGraph
                     | otherwise = (Right (), v, False, a)
 ;
 
-step :: Graph Int (Either Int (), Int, Bool, a) -> Graph Int (Either Int (), Int, Bool, a)
+type FoldGraph a = Graph Int (Either Int (), Int, Bool, a)
+
+step :: FoldGraph a -> FoldGraph a
 step gr = res
     where
         res = relaxed   -- TODO: add loop end
         relaxed = relaxEdges inspectedH
-        relaxEdges gr' = foldr f gr' candidates
-                where
-                    candidates
+        relaxEdges gr' = S.foldr f gr' candidates
+            where
+                f :: Vertex -> FoldGraph a -> FoldGraph a
+                f = undefined
+                candidates :: Set Vertex
+                candidates = S.filter markedFalse . fst . outgoing h $ gr'
+                markedFalse :: Vertex -> Bool
+                markedFalse v = case unsafeNameOf (vertices gr') v
+                                of (_,_,False,_) -> True
+                                   _ -> False
         h = minDistUninspected gr
+        minDistUninspected = undefined
         inspectedH = mapV (\v x@(dist,pred,ok,a) -> if v==h then (dist, pred, True, a) else x) gr
         
 

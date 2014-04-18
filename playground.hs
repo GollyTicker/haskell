@@ -32,6 +32,30 @@ myGraph = fromLabels $ M.fromList $
 
 namedGraph = myGraph `withVerticeMap` (M.fromList $ zip [0..4] ['A'..'E'])
 
+demoMap = mapE (\(s,d) w -> (s+1)*(s+6)*(d+3) `div` (s+1)) namedGraph
+{-
+*Main> mapE (\(s,d) w -> (s+1)*(s+6)*(d+3) `div` (s+1)) namedGraph
+Graph
+    0: 'A'
+    1: 'B'
+    2: 'C'
+    3: 'D'
+    4: 'E'
+    0 -> 1 | 24
+    0 -> 2 | 30
+    0 -> 3 | 36
+    0 -> 4 | 42
+    1 -> 2 | 35
+    1 -> 3 | 42
+    1 -> 4 | 49
+    2 -> 3 | 48
+    2 -> 4 | 56
+    3 -> 4 | 63
+*Main> bruteForceTSP demoMap
+([1,2,3,0,4],210)
+-}
+
+
 -- its assumed that all vertices are indeed connected. this is not checked!
 bruteForceTSP :: (Ord i, Num i) => Graph i a -> ([Vertex], i)
 bruteForceTSP gr =  minimumBy (comparing snd)

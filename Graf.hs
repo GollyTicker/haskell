@@ -19,7 +19,7 @@ module Graf
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M (empty, toList, union,
                                        lookup, keysSet, fromSet,
-                                       null, keys)
+                                       null, keys, mapWithKey)
 import Data.Tuple (swap) -- wtf, why is this not in Prelude?!
 import Data.Maybe (fromJust)
 import Data.Set (Set)
@@ -191,6 +191,16 @@ withEdgeMap gr edgemap = withVoidVertices . uptEdges $ gr
 withVerticeMap :: Graph i a -> Vertices b -> Graph i b
 withVerticeMap gr vmap = gr {vertices = vmap}
 
+-- EXPORTED
+mapE :: (Edge -> i -> j) -> Graph i a -> Graph j a
+mapE f x = x {edges = M.mapWithKey f (edges x)}
+-- EXPORTED
+mapV :: (Vertex -> a -> b) -> Graph i a -> Graph i b
+mapV f x = x {vertices = M.mapWithKey f (vertices x)}
+-- EXPORTED
+mapBi :: (Edge -> i -> j) -> (Vertex -> a -> b) -> Graph i a -> Graph j b
+mapBi f g = mapV g . mapE f
+
 
 -- Notes:
 -- maybe use some tracker to trace inconsistent graphs and force the usage of "restructure" to make them accissible again?
@@ -205,17 +215,6 @@ showGraph gr = "Graph"
                 ++ showWith (Right ()) gr   -- show vertices
                 ++ showWith (Left ()) gr    -- show edges
 ;
-
-
-mapE :: (Edge -> i -> j) -> Graph i a -> Graph j a
-mapE = undefined
-
-mapV :: (Vertex -> a -> b) -> Graph i a -> Graph i b
-mapV = undefined
-
-mapBi :: (Edge -> i -> j) -> (Vertex -> a -> b) -> Graph i a -> Graph j b
-mapBi = undefined
-
 
 showWith :: (Show i, Show a) => Either () () -> Graph i a -> String
 showWith choice gr = concat

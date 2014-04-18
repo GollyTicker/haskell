@@ -209,7 +209,7 @@ showEdge ((from, to), i) = show from ++ " -> " ++ show to ++ " | " ++ show i
 
 -- parses Graph files like from GKA
 -- EXPORTED
-fromString :: a
-fromString = undefined
+fromString :: String -> Either String (Graph String String) -- not yet types i and a.
+fromString = undefined      -- should be using Parsec!
 
 

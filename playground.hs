@@ -2,7 +2,6 @@
 import Graf
 import Data.Map.Strict as M (fromList)
 
-
 -- http://en.wikipedia.org/wiki/Ant_colony_optimization_algorithms#Overview
 
 {- 30-TSPsimple.graph
@@ -29,4 +28,3 @@ myWeightedMap = M.fromList $ zip
                         )
                         [5,10,15,20,35,40,45,25,30,50]  -- gewichtungsspalte
 ;
-

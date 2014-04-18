@@ -10,6 +10,7 @@ module Graf
     mapE, mapV, mapBi,
     empty, null,
     sizeV, sizeE,
+    adjacent, inzident,
     fromLabels, withEdgeMap,
     fromNames, withVerticeMap,
     fromString
@@ -25,10 +26,18 @@ import Data.Maybe (fromJust)
 import Data.Set (Set)
 import qualified Data.Set as S (findMax, insert, mapMonotonic,
                                 null, toList, fromList,
-                                size)
+                                size, map, filter,
+                                foldr, empty, insert)
 ;
 import Prelude hiding (null)
 -- Use -Wall plase.
+
+-- util. See "(f .) . g" on stackexchange haskell
+dot = (.) . (.)
+-- Example:
+-- concatMap f ls = concat . map f $ ls
+-- concatMap f = concat . map f
+-- concatMap = concat `dot` map
 
 {-
 Usage:
@@ -161,6 +170,27 @@ setToMap :: Set a -> Map a ()
 setToMap = M.fromSet (const ())
 
 -- ================================================================
+
+-- incident returns Sets of incident vertices and Edges.
+-- a vertice is only incident with ittselfs,
+-- if theres a "Schlinge" on it.
+incident :: Graph i a -> Vertex -> (Set Vertex, Set Edge)
+incident gr v = asTuple . S.map g . S.filter f . M.keysSet . edges $ gr
+        where
+            asTuple :: Set (Vertex, Edge)
+            asTuple = S.foldr step (S.empty, S.empty)
+                    where
+                        step (v,e) (vs,es) = (S.insert v vs, S.insert e es)
+            g :: Edge -> (Vertex, Edge)
+            g edge@(from, to)
+                | from == v = (to, edge)
+                | to == v = (from, edge)
+                | otherwise = error "incident. filter false."
+            f :: Edge -> Bool
+            f (from, to) = from == v || to == v
+
+adjacent :: Graph i a -> Vertex -> Set Vertex
+adjacent gr v = fst `dot` incident
 
 -- EXPORTED
 fromLabels :: Edges i -> Graph i ()

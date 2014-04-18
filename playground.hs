@@ -56,6 +56,9 @@ Graph
 -}
 
 
+
+
+
 -- its assumed that all vertices are indeed connected. this is not checked!
 bruteForceTSP :: (Ord i, Num i) => Graph i a -> ([Vertex], i)
 bruteForceTSP gr =  minimumBy (comparing snd)

@@ -4,11 +4,14 @@ module Graf
     Vertex, Edge,   -- type synonyms for Indices    
     Vertices, Edges, -- type synonyms for label/names maps
     vertices, edges, allV, allE,    -- simple accessors
+    allVlist, allElist,
     labelU, labelD, unsafeLabelU,     --  label access
     buildK,
+    mapE, mapV, mapBi,
     empty, null,
     sizeV, sizeE,
     fromLabels, withEdgeMap,
+    fromNames, withVerticeMap,
     fromString
    )
     where
@@ -16,7 +19,7 @@ module Graf
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M (empty, toList, union,
                                        lookup, keysSet, fromSet,
-                                       null)
+                                       null, keys)
 import Data.Tuple (swap) -- wtf, why is this not in Prelude?!
 import Data.Maybe (fromJust)
 import Data.Set (Set)
@@ -69,11 +72,14 @@ type Edges i = Map Edge i    -- weighted Edges
 -- EXPORTED
 allV :: Graph i a -> Set Vertex
 allV = M.keysSet . vertices
+allVlist :: Graph i a -> [Vertex]
+allVlist = M.keys . vertices
 
 -- EXPORTED
 allE :: Graph i a -> Set Edge
 allE = M.keysSet . edges
-;
+allElist :: Graph i a -> [Edge]
+allElist = M.keys . edges
 
 
 -- EXPORTED
@@ -161,6 +167,11 @@ fromLabels :: Edges i -> Graph i ()
 fromLabels = (empty `withEdgeMap`)
 -- make graph with multiples uses of `with`
 
+
+-- EXPORTED
+fromNames :: Vertices a -> Graph () a
+fromNames = (empty `withVerticeMap`)
+
 -- given a possibly inconsistent graph where
 -- there might be vertices in the edgeMap which dont appear in the vertices
 -- this function adds these vertices
@@ -176,6 +187,10 @@ withEdgeMap gr edgemap = withVoidVertices . uptEdges $ gr
             uptEdges g = g {edges = edgemap}
 ;
 
+-- EXPORTED
+withVerticeMap :: Graph i a -> Vertices b -> Graph i b
+withVerticeMap gr vmap = gr {vertices = vmap}
+
 
 -- Notes:
 -- maybe use some tracker to trace inconsistent graphs and force the usage of "restructure" to make them accissible again?
@@ -190,6 +205,16 @@ showGraph gr = "Graph"
                 ++ showWith (Right ()) gr   -- show vertices
                 ++ showWith (Left ()) gr    -- show edges
 ;
+
+
+mapE :: (Edge -> i -> j) -> Graph i a -> Graph j a
+mapE = undefined
+
+mapV :: (Vertex -> a -> b) -> Graph i a -> Graph i b
+mapV = undefined
+
+mapBi :: (Edge -> i -> j) -> (Vertex -> a -> b) -> Graph i a -> Graph j b
+mapBi = undefined
 
 
 showWith :: (Show i, Show a) => Either () () -> Graph i a -> String

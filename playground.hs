@@ -1,6 +1,8 @@
 
 import Graf
 import Data.Map.Strict as M (fromList)
+import Data.List (minimumBy, permutations)
+import Data.Ord (comparing)
 
 -- http://en.wikipedia.org/wiki/Ant_colony_optimization_algorithms#Overview
 
@@ -26,4 +28,22 @@ myGraph = fromLabels $ M.fromList $
                             [1,2,3,4,2,3,4,3,4,4]   -- zweite spalte
                         )
                         [5,10,15,20,35,40,45,25,30,50]  -- gewichtungsspalte
+;
+
+namedGraph = myGraph `withVerticeMap` (M.fromList $ zip [0..4] ['A'..'E'])
+
+-- its assumed that all vertices are indeed connected. this is not checked!
+bruteForceTSP :: (Ord i, Num i) => Graph i a -> ([Vertex], i)
+bruteForceTSP gr =  minimumBy (comparing snd)
+                    . map (tourDistance $ edges gr)
+                    . permutations
+                    . allVlist
+                    $ gr
+;
+
+tourDistance :: (Eq i, Num i) => Edges i -> [Vertex] -> ([Vertex], i)
+tourDistance es vs = (vs, sum . mapConsecutives dist $ vs)
+            where
+                mapConsecutives f ls = zipWith f ls (tail $ cycle ls)
+                dist from to = unsafeLabelU es (from, to)
 ;

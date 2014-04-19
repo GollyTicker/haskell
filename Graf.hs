@@ -12,7 +12,7 @@ module Graf
     empty, null,
     sizeV, sizeE,
     adjacent, incident,
-    outgoing, incoming,
+    outgoingD, incomingD,
     fromLabels, withEdgeMap,
     fromNames, withVerticeMap,
     fromEdgeList, addEdges,
@@ -253,20 +253,22 @@ adjacent = fst `dot` incident
 {-
 Returns all the outgoing vertices and edges for this vertex.
 -}
-outgoing :: Vertex -> Graph i a -> (Set Vertex, Set Edge)
-outgoing v gr = let es = S.filter ((v==) . fst) . snd . incident v $ gr
-                    vs = S.map snd es
-                in (vs, es)
+outgoingD :: Vertex -> Graph i a -> (Set Vertex, Set Edge)
+outgoingD v gr = let es = S.filter ((v==) . fst) . snd . incident v $ gr
+                     vs = S.map snd es
+                 in (vs, es)
 ;
 
 -- EXPORTED
 {-
 Returns all the outgoing vertices and edges for this vertex.
 -}
-incoming :: Vertex -> Graph i a -> (Set Vertex, Set Edge)
-incoming v gr = let es = S.filter ((v==) . snd) . snd . incident v $ gr
-                    vs = S.map fst es
-                in (vs, es)
+incomingD :: Vertex -> Graph i a -> (Set Vertex, Set Edge)
+incomingD v gr = let es = S.filter ((v==) . snd) . snd . incident v $ gr
+                     vs = S.map fst es
+                 in (vs, es)
+;
+
 -- EXPORTED
 {-
 Build a new Graph from labeled Edge.

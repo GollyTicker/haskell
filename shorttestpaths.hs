@@ -2,7 +2,7 @@
 
 
 import Graf
-import Data.Map.Strict as M (Map, fromList, filter, assocs)
+import Data.Map.Strict as M (Map, null, fromList, filter, assocs)
 import Data.Set as S (Set, foldr, filter)
 import Control.Applicative ((<$>), (<*>))
 import Data.List as L (minimumBy)
@@ -10,30 +10,49 @@ import Data.Ord (comparing)
 
 
 -- shortestPaths :: (Bounded i, Num i, Ord i) => Graph i a -> Vertex -> Graph (i, Maybe Vertex) a
--- shortestPaths :: Vertex -> Graph Int a -> Graph (Int, Maybe Vertex) a
-shortestPaths source gr = resGraph
+shortestPaths :: Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
+shortestPaths source gr = shortestPathgraph
         where
-            resGraph = step initGraph
+            shortestPathgraph = fromFoldGraph resGraph
+            resGraph = iterateWhile hasUninspected step initGraph
             initGraph = mapV initialize gr
             -- (Entf, Vorg, OK, a)
             -- Right in Entf represents an infinite distance
             initialize v a
-                    | v == source = (Left 0, v, False, a)
-                    | otherwise = (Right (), v, False, a)
+                    | v == source = (Left 0, Just v, False, a)
+                    | otherwise = (Right (), Nothing, False, a)
 ;
 
-type FoldGraph a = Graph Int (Either Int (), Int, Bool, a)
+type FoldGraph a = Graph Int (Either Int (), Maybe Int, Bool, a)
+
+fromFoldGraph :: FoldGraph a -> Graph Int (a, Maybe (Vertex, Int))
+fromFoldGraph gr = let f _ (mdist, mpred, _, a) =
+                            (a, (,) <$> (toMaybe mdist) <*> mpred)
+                   in mapV f gr 
+;
+
+toMaybe :: Either a b -> Maybe a
+toMaybe (Left a) = Just a
+toMaybe _ = Nothing
+
+iterateWhile :: (a -> Bool) -> (a -> a) -> a -> a
+iterateWhile g f x
+            | g x = iterateWhile g f (f x)
+            | otherwise = x
+;
+
+hasUninspected :: FoldGraph a -> Bool
+hasUninspected gr = not . M.null . M.filter (not . thr4) . vertices $ gr
 
 step :: FoldGraph a -> FoldGraph a
-step gr = res
+step gr = relaxed
     where
-        res = relaxed   -- TODO: add loop end
         relaxed = relaxEdges h inspectedH
         h = minDistUninspected gr
         inspectedH = fname (\(dist,pred,ok,a) -> (dist, pred, True, a)) h gr
 ;
 
-getMinDist :: Map Vertex (Either Int (), Int, Bool, a) -> Vertex
+getMinDist :: Map Vertex (Either Int (), Maybe Int, Bool, a) -> Vertex
 getMinDist mp = fst . L.minimumBy (comparing (fst4 . snd)) . M.assocs $ mp
 
 minDistUninspected :: FoldGraph a -> Vertex
@@ -44,7 +63,6 @@ relaxEdges h gr' = S.foldr (relax h) gr' candidates
     where
         candidates :: Set Vertex
         candidates = S.filter (uninspected gr') . fst . outgoing h $ gr'
-       
 ;
 
 thr4 :: (a,b,c,d) -> c
@@ -66,7 +84,7 @@ relax :: Vertex -> Vertex -> FoldGraph a -> FoldGraph a
 relax h v gr = fname f v gr
     where
         f tpl@(d,pred, ok, a)
-            | d > alternative = (alternative, h, ok, a)
+            | d > alternative = (alternative, Just h, ok, a)
             | otherwise = tpl
         alternative = dist gr h `eitherAdd` label
         ea `eitherAdd` eb = eswap $ do 
@@ -91,5 +109,8 @@ myGraph = fromLabels $ M.fromList $
                         )
                         [5,10,15,20,35,40,45,25,30,50]  -- gewichtungsspalte
 ;
+
+shortestPathGraph = shortestPaths 0 myGraph
+
 
 

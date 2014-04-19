@@ -119,18 +119,18 @@ instance (Show i, Show a) => Show (Graph i a) where
 {-
 Functions to access names of vertices
 -}
-unsafeNameOf :: Vertices a -> Vertex -> a
+unsafeNameOf :: Graph i a -> Vertex -> a
 unsafeNameOf = fromJust `dot` nameOf
 
-nameOf :: Vertices a -> Vertex-> Maybe a
-nameOf = flip M.lookup
+nameOf :: Graph i a -> Vertex-> Maybe a
+nameOf = flip M.lookup . vertices
 
 -- EXPORTED
 {-
 Accesses an undirected Edge and returns its contents.
 Returns Nothing if no edge was found.
 -}
-labelU :: Eq i => Edges i -> Edge -> Maybe i
+labelU :: Eq i => Graph i a -> Edge -> Maybe i
 labelU w e
         | a == Nothing = b
         | otherwise = a
@@ -143,8 +143,8 @@ labelU w e
 Returns the labeling of the given edge of a Map of Edges.
 Returns Nothing if it fails.
 -}
-labelD :: Eq i => Edges i -> Edge -> Maybe i
-labelD = flip M.lookup
+labelD :: Eq i => Graph i a -> Edge -> Maybe i
+labelD = flip M.lookup . edges
 
 -- EXPORTED
 {-
@@ -153,7 +153,7 @@ Applies a function to a named verrtice.
 fname :: (a -> a) -> Vertex -> Graph i a -> Graph i a
 fname f v gr = gr {vertices = vs'}
         where vs' = M.insert v (f x) $ vertices gr
-              x = unsafeNameOf (vertices gr) v
+              x = unsafeNameOf gr v
 
 -- for given weights, get the weigth inbetween the given vertices.
 -- because the order of the vertices isnt specified, both possibilities have to be tried out.
@@ -164,7 +164,7 @@ fname f v gr = gr {vertices = vs'}
 Gets the label of an Edge in the edges of an undirected Graph.
 It should only be used, if one is sure, that the edge really exists.
 -}
-unsafeLabelU :: Eq i => Edges i -> Edge -> i
+unsafeLabelU :: Eq i => Graph i a -> Edge -> i
 unsafeLabelU = fromJust `dot` labelU
 ;
 

@@ -238,6 +238,9 @@ asTuple = S.foldr step (S.empty, S.empty)
             step (v,e) (vs,es) = (S.insert v vs, S.insert e es)
 ;
 
+-- TODO: get some useful interface functions from the usage
+-- of this grafadt in f.e. djisktra
+
 -- EXPORTED
 {-
 Returns all vertices this vertice is connected with.
@@ -304,7 +307,7 @@ withVoidVertices :: Graph a () -> Graph a ()
 withVoidVertices gr = let newVertices = M.union (vertices gr) (getVertices $ edges gr)
                           getVertices = setToMap . S.fromList . (concatMap (\(a,b) -> [a,b])) . S.toList .  M.keysSet
                       in gr {vertices = newVertices}
-
+;
 -- EXPORTED
 {-
 Returns a new Graph with the same vertices but the new given edges.

@@ -2,9 +2,11 @@
 
 
 import Graf
-import Data.Map.Strict as M (fromList)
+import Data.Map.Strict as M (Map, fromList, filter, assocs)
 import Data.Set as S (Set, foldr, filter)
 import Control.Applicative ((<$>), (<*>))
+import Data.List as L (minimumBy)
+import Data.Ord (comparing)
 
 
 -- shortestPaths :: (Bounded i, Num i, Ord i) => Graph i a -> Vertex -> Graph (i, Maybe Vertex) a
@@ -28,9 +30,14 @@ step gr = res
         res = relaxed   -- TODO: add loop end
         relaxed = relaxEdges h inspectedH
         h = minDistUninspected gr
-        minDistUninspected = undefined -- M.filter (\v -> uninspected) $ vertices gr'
-        inspectedH = mapV (\v x@(dist,pred,ok,a) -> if v==h then (dist, pred, True, a) else x) gr
+        inspectedH = fname (\(dist,pred,ok,a) -> (dist, pred, True, a)) h gr
 ;
+
+getMinDist :: Map Vertex (Either Int (), Int, Bool, a) -> Vertex
+getMinDist mp = fst . L.minimumBy (comparing (fst4 . snd)) . M.assocs $ mp
+
+minDistUninspected :: FoldGraph a -> Vertex
+minDistUninspected gr = getMinDist . M.filter (not . thr4) $ vertices gr
 
 relaxEdges :: Vertex -> FoldGraph a -> FoldGraph a
 relaxEdges h gr' = S.foldr (relax h) gr' candidates
@@ -39,11 +46,19 @@ relaxEdges h gr' = S.foldr (relax h) gr' candidates
         candidates = S.filter (uninspected gr') . fst . outgoing h $ gr'
        
 ;
+
+thr4 :: (a,b,c,d) -> c
+thr4 (a,b,c,d) = c
+
+fst4 :: (a,b,c,d) -> a
+fst4 (a,b,c,d) = a
+
 uninspected :: FoldGraph a -> Vertex -> Bool
 uninspected gr v = case unsafeNameOf (vertices gr) v
                 of (_,_,False,_) -> True
                    _ -> False 
 ;
+
 dist :: FoldGraph a -> Vertex -> Either Int ()
 dist gr = (\(d, _,_,_) -> d) . unsafeNameOf (vertices gr)
 

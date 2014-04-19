@@ -68,15 +68,15 @@ hausDesNikolaus' = hausDesNikolaus `addEdges` [(2,0), (3,1)]
 -- its assumed that all vertices are indeed connected. this is not checked!
 bruteForceTSP :: (Ord i, Num i) => Graph i a -> ([Vertex], i)
 bruteForceTSP gr =  minimumBy (comparing snd)
-                    . map (tourDistance $ edges gr)
+                    . map (tourDistance gr)
                     . permutations
                     . allVlist
                     $ gr
 ;
 
-tourDistance :: (Eq i, Num i) => Edges i -> [Vertex] -> ([Vertex], i)
-tourDistance es vs = (vs, sum . mapConsecutives dist $ vs)
+tourDistance :: (Eq i, Num i) => Graph i a -> [Vertex] -> ([Vertex], i)
+tourDistance gr vs = (vs, sum . mapConsecutives dist $ vs)
             where
                 mapConsecutives f ls = zipWith f ls (tail $ cycle ls)
-                dist from to = unsafeLabelU es (from, to)
+                dist from to = unsafeLabelU gr (from, to)
 ;

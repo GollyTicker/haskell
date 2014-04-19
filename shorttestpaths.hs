@@ -7,10 +7,10 @@ import Data.Set as S (Set, foldr, filter)
 import Control.Applicative ((<$>), (<*>))
 import Data.List as L (minimumBy)
 import Data.Ord (comparing)
-
+import Debug.Trace
 
 -- shortestPaths :: (Bounded i, Num i, Ord i) => Graph i a -> Vertex -> Graph (i, Maybe Vertex) a
-djikstraf :: (Edges Int -> Edge -> Maybe Int) -> Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
+djikstraf :: LabelF Int a -> Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
 djikstraf labelf source gr = shortestPathgraph
         where
             shortestPathgraph = fromFoldGraph resGraph
@@ -29,8 +29,10 @@ shortestPathsU = djikstraf labelU
 shortestPathsD :: Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
 shortestPathsD = djikstraf labelD
 
+type LabelF i a = Graph i (FoldElems a) -> Edge -> Maybe i
+type FoldGraph a = Graph Int (FoldElems a)
+type FoldElems a = (Either Int (), Maybe Int, Bool, a)
 
-type FoldGraph a = Graph Int (Either Int (), Maybe Int, Bool, a)
 
 fromFoldGraph :: FoldGraph a -> Graph Int (a, Maybe (Vertex, Int))
 fromFoldGraph gr = let f _ (mdist, mpred, _, a) =
@@ -51,21 +53,21 @@ iterateWhile g f x
 hasUninspected :: FoldGraph a -> Bool
 hasUninspected gr = not . M.null . M.filter (not . thr4) . vertices $ gr
 
-step :: (Edges Int -> Edge -> Maybe Int) -> FoldGraph a -> FoldGraph a
-step labelf gr = relaxed
+step :: LabelF Int a -> FoldGraph a -> FoldGraph a
+step labelf gr = trace ("<a> " ++ show h) relaxed
     where
         relaxed = relaxEdges labelf h inspectedH
         h = minDistUninspected gr
         inspectedH = fname (\(dist,pred,ok,a) -> (dist, pred, True, a)) h gr
 ;
 
-getMinDist :: Map Vertex (Either Int (), Maybe Int, Bool, a) -> Vertex
+getMinDist :: Map Vertex (FoldElems a) -> Vertex
 getMinDist mp = fst . L.minimumBy (comparing (fst4 . snd)) . M.assocs $ mp
 
 minDistUninspected :: FoldGraph a -> Vertex
 minDistUninspected gr = getMinDist . M.filter (not . thr4) $ vertices gr
 
-relaxEdges :: (Edges Int -> Edge -> Maybe Int) -> Vertex -> FoldGraph a -> FoldGraph a
+relaxEdges :: LabelF Int a -> Vertex -> FoldGraph a -> FoldGraph a
 relaxEdges labelf h gr' = S.foldr (relax labelf h) gr' candidates
     where
         candidates :: Set Vertex
@@ -79,26 +81,27 @@ fst4 :: (a,b,c,d) -> a
 fst4 (a,b,c,d) = a
 
 uninspected :: FoldGraph a -> Vertex -> Bool
-uninspected gr v = case unsafeNameOf (vertices gr) v
+uninspected gr v = case unsafeNameOf gr v
                 of (_,_,False,_) -> True
                    _ -> False 
 ;
 
 dist :: FoldGraph a -> Vertex -> Either Int ()
-dist gr = (\(d, _,_,_) -> d) . unsafeNameOf (vertices gr)
+dist gr = (\(d, _,_,_) -> d) . unsafeNameOf gr
 
-relax :: (Edges Int -> Edge -> Maybe Int) -> Vertex -> Vertex -> FoldGraph a -> FoldGraph a
+relax :: LabelF Int a -> Vertex -> Vertex -> FoldGraph a -> FoldGraph a
 relax labelf h v gr = fname f v gr
     where
         f tpl@(d,pred, ok, a)
-            | d > alternative = (alternative, Just h, ok, a)
+            | d > alternative = trace ("<b> " ++ show v) (alternative, Just h, ok, a)
             | otherwise = tpl
         alternative = dist gr h `eitherAdd` label
-        ea `eitherAdd` eb = eswap $ do 
+        ea `eitherAdd` eb = eswap $ do
                             a <- eswap ea
                             b <- eswap eb
                             return (a+b)
-        label = case labelf (edges gr) (h,v) of
+        label :: Either Int ()
+        label = case labelf gr (h,v) of
                     Nothing -> Right ()
                     Just x -> Left x
 ;
@@ -117,7 +120,15 @@ myGraph = fromLabels $ M.fromList $
                         [5,10,15,20,35,40,45,25,30,50]  -- gewichtungsspalte
 ;
 
-shortestPathGraph = shortestPathsU 2 myGraph
+calcPaths :: IO ()
+calcPaths = print (shortestPathsU 0 simpleGraph)
 
+simpleGraph = fromLabels $ M.fromList $ zip
+                        (zip
+                            [0,1,2]
+                            [1,2,0]
+                        )
+                        [2,1,4]
+;
 
 

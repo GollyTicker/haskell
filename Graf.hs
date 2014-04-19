@@ -349,8 +349,8 @@ nl = "\n"
 indent = "    "
 showGraph :: (Show a, Show i) => Graph i a -> String
 showGraph gr = "Graph "
-                ++ "|V| = " ++ show (sizeV gr) ++ ", "
-                ++ "|E| = " ++ show (sizeE gr)
+                ++ "#V = " ++ show (sizeV gr) ++ ", "
+                ++ "#E = " ++ show (sizeE gr)
                 ++ showWith (Right ()) gr   -- show vertices
                 ++ showWith (Left ()) gr    -- show edges
 ;

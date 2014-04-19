@@ -7,14 +7,17 @@ import Data.Set as S (Set, foldr, filter)
 import Control.Applicative ((<$>), (<*>))
 import Data.List as L (minimumBy)
 import Data.Ord (comparing)
-import Debug.Trace
+
+-- util. See "(f .) . g" on stackexchange haskell
+dot :: (b -> c) -> (a1 -> a2 -> b) -> a1 -> a2 -> c
+dot = (.) . (.)
 
 -- shortestPaths :: (Bounded i, Num i, Ord i) => Graph i a -> Vertex -> Graph (i, Maybe Vertex) a
-djikstraf :: LabelF Int a -> Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
-djikstraf labelf source gr = shortestPathgraph
+dijkstraF :: DirInf Int a -> Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
+dijkstraF dirinfo source gr = shortestPathgraph
         where
             shortestPathgraph = fromFoldGraph resGraph
-            resGraph = iterateWhile hasUninspected (step labelf) initGraph
+            resGraph = iterateWhile hasUninspected (step dirinfo) initGraph
             initGraph = mapV initialize gr
             -- (Entf, Vorg, OK, a)
             -- Right in Entf represents an infinite distance
@@ -23,13 +26,15 @@ djikstraf labelf source gr = shortestPathgraph
                     | otherwise = (Right (), Nothing, False, a)
 ;
 
-shortestPathsU :: Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
-shortestPathsU = djikstraf labelU
+dijkstraU :: Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
+dijkstraU = dijkstraF (labelU, adjacent) -- adjacent are outgoing vertices for undirected graphs
 
-shortestPathsD :: Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
-shortestPathsD = djikstraf labelD
+dijkstraD :: Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
+dijkstraD = dijkstraF (labelD, fst `dot` outgoingD )
 
 type LabelF i a = Graph i (FoldElems a) -> Edge -> Maybe i
+type DirInf i a = (LabelF i a, -- label accessor
+                    Vertex -> Graph i (FoldElems a) -> Set Vertex)  -- outgoing accessor
 type FoldGraph a = Graph Int (FoldElems a)
 type FoldElems a = (Either Int (), Maybe Int, Bool, a)
 
@@ -53,10 +58,10 @@ iterateWhile g f x
 hasUninspected :: FoldGraph a -> Bool
 hasUninspected gr = not . M.null . M.filter (not . thr4) . vertices $ gr
 
-step :: LabelF Int a -> FoldGraph a -> FoldGraph a
-step labelf gr = trace ("<a> " ++ show h) relaxed
+step :: DirInf Int a -> FoldGraph a -> FoldGraph a
+step dirinfo gr = relaxed
     where
-        relaxed = relaxEdges labelf h inspectedH
+        relaxed = relaxEdges dirinfo h inspectedH
         h = minDistUninspected gr
         inspectedH = fname (\(dist,pred,ok,a) -> (dist, pred, True, a)) h gr
 ;
@@ -67,11 +72,11 @@ getMinDist mp = fst . L.minimumBy (comparing (fst4 . snd)) . M.assocs $ mp
 minDistUninspected :: FoldGraph a -> Vertex
 minDistUninspected gr = getMinDist . M.filter (not . thr4) $ vertices gr
 
-relaxEdges :: LabelF Int a -> Vertex -> FoldGraph a -> FoldGraph a
-relaxEdges labelf h gr' = S.foldr (relax labelf h) gr' candidates
+relaxEdges :: DirInf Int a -> Vertex -> FoldGraph a -> FoldGraph a
+relaxEdges (labelf, out) h gr' = S.foldr (relax labelf h) gr' candidates
     where
         candidates :: Set Vertex
-        candidates = S.filter (uninspected gr') . fst . outgoing h $ gr'
+        candidates = S.filter (uninspected gr') . out h $ gr'
 ;
 
 thr4 :: (a,b,c,d) -> c
@@ -81,9 +86,7 @@ fst4 :: (a,b,c,d) -> a
 fst4 (a,b,c,d) = a
 
 uninspected :: FoldGraph a -> Vertex -> Bool
-uninspected gr v = case unsafeNameOf gr v
-                of (_,_,False,_) -> True
-                   _ -> False 
+uninspected = (not . thr4) `dot` unsafeNameOf
 ;
 
 dist :: FoldGraph a -> Vertex -> Either Int ()
@@ -93,14 +96,13 @@ relax :: LabelF Int a -> Vertex -> Vertex -> FoldGraph a -> FoldGraph a
 relax labelf h v gr = fname f v gr
     where
         f tpl@(d,pred, ok, a)
-            | d > alternative = trace ("<b> " ++ show v) (alternative, Just h, ok, a)
+            | d > alternative = (alternative, Just h, ok, a)
             | otherwise = tpl
         alternative = dist gr h `eitherAdd` label
         ea `eitherAdd` eb = eswap $ do
                             a <- eswap ea
                             b <- eswap eb
                             return (a+b)
-        label :: Either Int ()
         label = case labelf gr (h,v) of
                     Nothing -> Right ()
                     Just x -> Left x
@@ -120,8 +122,9 @@ myGraph = fromLabels $ M.fromList $
                         [5,10,15,20,35,40,45,25,30,50]  -- gewichtungsspalte
 ;
 
-calcPaths :: IO ()
-calcPaths = print (shortestPathsU 0 simpleGraph)
+sp1 = dijkstraU 3 myGraph
+
+sp2 = dijkstraD 0 simpleGraph
 
 simpleGraph = fromLabels $ M.fromList $ zip
                         (zip

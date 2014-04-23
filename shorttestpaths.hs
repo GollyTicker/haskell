@@ -1,6 +1,4 @@
 
-
-
 import Graf
 import Data.Map.Strict as M (Map, null, fromList, filter, assocs)
 import Data.Set as S (Set, foldr, filter)
@@ -8,19 +6,20 @@ import Control.Applicative ((<$>), (<*>))
 import Data.List as L (minimumBy)
 import Data.Ord (comparing)
 
--- util. See "(f .) . g" on stackexchange haskell
+-- utility funciton to compose two functions applying two argument to the first one insteadt of only one.
+-- See "(f .) . g" on stackexchange haskell       -- why is this not in standard haskell libraries? Prelude, Data.Function ... nowhere.
 dot :: (b -> c) -> (a1 -> a2 -> b) -> a1 -> a2 -> c
-dot = (.) . (.)
+dot = (.) . (.) -- boobs
 
--- shortestPaths :: (Bounded i, Num i, Ord i) => Graph i a -> Vertex -> Graph (i, Maybe Vertex) a
+-- see GRBuch GKA Dijkstra for more info.
+
+
 dijkstraF :: DirInf Int a -> Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
 dijkstraF dirinfo source gr = shortestPathgraph
         where
             shortestPathgraph = fromFoldGraph resGraph
             resGraph = iterateWhile hasUninspected (step dirinfo) initGraph
-            initGraph = mapV initialize gr
-            -- (Entf, Vorg, OK, a)
-            -- Right in Entf represents an infinite distance
+            initGraph = mapVWithKey initialize gr
             initialize v a
                     | v == source = (Left 0, Just v, False, a)
                     | otherwise = (Right (), Nothing, False, a)
@@ -32,15 +31,35 @@ dijkstraU = dijkstraF (labelU, adjacent) -- adjacent are outgoing vertices for u
 dijkstraD :: Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
 dijkstraD = dijkstraF (labelD, fst `dot` outgoingD )
 
+
+-- These two following Types are just for me to delegate the two functions differentiating
+-- directed and undirected to the lower levels functions they are used by.
+-- LabelF is the type of the functions to access the labels of a graph.
+
+-- A graphs label can be interpreted as a directed or undirected edge.
 type LabelF i a = Graph i (FoldElems a) -> Edge -> Maybe i
+-- the DirInf stands for direction information.
 type DirInf i a = (LabelF i a, -- label accessor
                     Vertex -> Graph i (FoldElems a) -> Set Vertex)  -- outgoing accessor
+;
+-- The graph needs to hold additional information for the steps.
 type FoldGraph a = Graph Int (FoldElems a)
+-- the simple names of the vertices are transfered into a Tuple4 containing (Entf, Vorg, OK, a)
 type FoldElems a = (Either Int (), Maybe Int, Bool, a)
+    -- The Either Int () represents a numeric field with infinity.
+    -- Taking Double with its built in Infinity ist suited, because its not a polymorphic/generic number format.
+    -- Should allow any type of numberic+ordable type as distances.
+    -- Nothing cannot be used here for infinity, because:
+    -- Just 5 < Nothing == False
+    -- But Either works because it ifrst sorts by the constructor.
+    -- Left x < Right y == True
+    -- The Maybe Int represents a possible predeseccor vertice.
+    -- The Bool is sued for Dijkstra to mark inspected vertices.
+    -- And the a is the original name of the graphs vertice.
 
-
+-- TODO document here.
 fromFoldGraph :: FoldGraph a -> Graph Int (a, Maybe (Vertex, Int))
-fromFoldGraph gr = let f _ (mdist, mpred, _, a) =
+fromFoldGraph gr = let f (mdist, mpred, _, a) =
                             (a, (,) <$> (toMaybe mdist) <*> mpred)
                    in mapV f gr
 ;
@@ -99,18 +118,18 @@ relax labelf h v gr = fname f v gr
             | d > alternative = (alternative, Just h, ok, a)
             | otherwise = tpl
         alternative = dist gr h `eitherAdd` label
-        ea `eitherAdd` eb = eswap $ do
-                            a <- eswap ea
-                            b <- eswap eb
+        ea `eitherAdd` eb = flipEither $ do
+                            a <- flipEither ea
+                            b <- flipEither eb
                             return (a+b)
         label = case labelf gr (h,v) of
                     Nothing -> Right ()
                     Just x -> Left x
 ;
 
-eswap :: Either a b -> Either b a
-eswap (Left a) = Right a
-eswap (Right b) = Left b
+flipEither :: Either a b -> Either b a
+flipEither (Left a) = Right a
+flipEither (Right b) = Left b
 
 myGraph :: Graph Int ()         -- graph30 from GKA -- 0 to 4 stands for A to E
 myGraph = fromLabels $ M.fromList $
@@ -121,6 +140,10 @@ myGraph = fromLabels $ M.fromList $
                         )
                         [5,10,15,20,35,40,45,25,30,50]  -- gewichtungsspalte
 ;
+
+-- TODO:
+-- * generic label type: shortestPaths :: (Bounded i, Num i, Ord i) => Graph i a -> Vertex -> Graph (i, Maybe Vertex) a
+-- * function to calculate the path out of the new graph.
 
 sp1 = dijkstraU 3 myGraph
 

@@ -8,7 +8,8 @@ module Graf
     nameOf, unsafeNameOf, fname,
     labelU, labelD, unsafeLabelU,     --  label access
     buildK,
-    mapE, mapV, mapBi,
+    mapE, mapV,
+    mapEWithKey, mapVWithKey,
     empty, null,
     sizeV, sizeE,
     adjacent, incident,
@@ -330,23 +331,29 @@ withVerticeMap gr vmap = gr {vertices = vmap}
 
 -- EXPORTED
 {-
-Change the label of edges by their indices and old labels
+Same as mapE and mapV but also provides their identifier for application.
 -}
-mapE :: (Edge -> i -> j) -> Graph i a -> Graph j a
-mapE f x = x {edges = M.mapWithKey f (edges x)}
+mapEWithKey :: (Edge -> i -> j) -> Graph i a -> Graph j a
+mapEWithKey f x = x {edges = M.mapWithKey f (edges x)}
+
+mapVWithKey :: (Vertex -> a -> b) -> Graph i a -> Graph i b
+mapVWithKey f x = x {vertices = M.mapWithKey f (vertices x)}
+
+-- EXPORTED
+{-
+Change the label/name of edges/vertices by their old label/name.
+-}
+mapV :: (a -> b) -> Graph i a -> Graph i b
+mapV f = mapVWithKey (const f)
+
+mapE :: (i -> j) -> Graph i a -> Graph j a
+mapE f = mapEWithKey (const f)
+
 
 -- EXPORTED
 {-
 Change the name of vertices by their indices and old names.
 -}
-mapV :: (Vertex -> a -> b) -> Graph i a -> Graph i b
-mapV f x = x {vertices = M.mapWithKey f (vertices x)}
--- EXPORTED
-{-
-Combines mapV and mapV into a single map.
--}
-mapBi :: (Edge -> i -> j) -> (Vertex -> a -> b) -> Graph i a -> Graph j b
-mapBi f g = mapV g . mapE f
 
 -- ======================    SHOW     ==========================
 nl, indent :: String

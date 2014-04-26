@@ -152,10 +152,17 @@ myGraph = fromLabels $ M.fromList $
 pathFromShortestPathsGraph :: Graph Int (a, Maybe (Vertex, Int)) -> Vertex -> Graph Int (a, Maybe ([Vertex],Int))
 pathFromShortestPathsGraph gr src = mapVWithKey (fmap . predToPath gr src) $ gr
 
-predToPath :: Graph Int (a, Maybe (Vertex, Int)) -> Vertex -> Vertex -> Maybe (Vertex, Int) -> Maybe ([Vertex], Int)
+predToPath :: Graph Int (a, Maybe (Vertex, Int))    -- graph
+            -> Vertex -- source
+            -> Vertex -- destination
+            -> Maybe (Vertex, Int)
+            -> Maybe ([Vertex], Int)
 predToPath gr src dest Nothing = Nothing
-predToPath gr src dest (Just (pred, dist)) | src == dest = Just ([], dist)
-predToPath gr src dest (Just (pred, dist)) = Just (dest: (predToPath gr src pred (fst . fromJust $ unsafeNameOf gr pred)) , dist)
+predToPath gr src dest (Just (pred, dist))
+                    | src == dest = Just ([], 0)
+                    | otherwise = predToPath gr src pred >>=
+                                    \(Just (ps, dists)) -> Just (dest:pred, dists + dist)
+;
 
 sp1 = dijkstraU 3 myGraph
 

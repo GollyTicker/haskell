@@ -4,6 +4,7 @@ import Data.Map.Strict as M (Map, null, fromList, filter, assocs)
 import Data.Set as S (Set, foldr, filter)
 import Control.Applicative ((<$>), (<*>))
 import Data.List as L (minimumBy)
+import Data.Maybe (fromJust)
 import Data.Ord (comparing)
 
 -- utility funciton to compose two functions applying two argument to the first one insteadt of only one.
@@ -17,8 +18,8 @@ dot = (.) . (.) -- boobs
 dijkstraF :: DirInf Int a -> Vertex -> Graph Int a -> Graph Int (a, Maybe (Vertex, Int))
 dijkstraF dirinfo source gr = shortestPathgraph
         where
-            shortestPathgraph = fromFoldGraph resGraph
-            resGraph = iterateWhile hasUninspected (step dirinfo) initGraph
+            shortestPathgraph = finalize resGraph
+            resGraph = while hasUninspected (step dirinfo) initGraph
             initGraph = mapVWithKey initialize gr
             initialize v a
                     | v == source = (Left 0, Just v, False, a)
@@ -57,10 +58,10 @@ type FoldElems a = (Either Int (), Maybe Int, Bool, a)
     -- The Bool is sued for Dijkstra to mark inspected vertices.
     -- And the a is the original name of the graphs vertice.
 
--- TODO document here.
-fromFoldGraph :: FoldGraph a -> Graph Int (a, Maybe (Vertex, Int))
-fromFoldGraph gr = let f (mdist, mpred, _, a) =
-                            (a, (,) <$> (toMaybe mdist) <*> mpred)
+-- Turns a Graph used for the algorithm into a final graph.
+finalize :: FoldGraph a -> Graph Int (a, Maybe (Vertex, Int))
+finalize gr = let f (mdist, mpred, _, a) =
+                            (a, (,) <$> (toMaybe mdist) <*> mpred) -- Either Int () -> Maybe Int -> Maybe (Int, Int)
                    in mapV f gr
 ;
 
@@ -68,9 +69,9 @@ toMaybe :: Either a b -> Maybe a
 toMaybe (Left a) = Just a
 toMaybe _ = Nothing
 
-iterateWhile :: (a -> Bool) -> (a -> a) -> a -> a
-iterateWhile g f x
-            | g x = iterateWhile g f (f x)
+while :: (a -> Bool) -> (a -> a) -> a -> a
+while g f x
+            | g x = while g f (f x)
             | otherwise = x
 ;
 
@@ -144,6 +145,17 @@ myGraph = fromLabels $ M.fromList $
 -- TODO:
 -- * generic label type: shortestPaths :: (Bounded i, Num i, Ord i) => Graph i a -> Vertex -> Graph (i, Maybe Vertex) a
 -- * function to calculate the path out of the new graph.
+
+
+-- maybe also a type decl for shortest path graphs
+
+pathFromShortestPathsGraph :: Graph Int (a, Maybe (Vertex, Int)) -> Vertex -> Graph Int (a, Maybe ([Vertex],Int))
+pathFromShortestPathsGraph gr src = mapVWithKey (fmap . predToPath gr src) $ gr
+
+predToPath :: Graph Int (a, Maybe (Vertex, Int)) -> Vertex -> Vertex -> Maybe (Vertex, Int) -> Maybe ([Vertex], Int)
+predToPath gr src dest Nothing = Nothing
+predToPath gr src dest (Just (pred, dist)) | src == dest = Just ([], dist)
+predToPath gr src dest (Just (pred, dist)) = Just (dest: (predToPath gr src pred (fst . fromJust $ unsafeNameOf gr pred)) , dist)
 
 sp1 = dijkstraU 3 myGraph
 

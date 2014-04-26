@@ -38,6 +38,7 @@ import qualified Data.Set as S (findMax, insert, mapMonotonic,
                                 size, map, filter,
                                 foldr, empty, insert)
 ;
+import Text.ParserCombinators.Parsec (GenParser, ParseError, char, many, noneOf, (<|>), parse)
 import Prelude hiding (null)
 
 -- Use -Wall plase.
@@ -388,7 +389,22 @@ showEdge ((from, to), i) = show from ++ " -> " ++ show to ++ " | " ++ show i
 Parse a Graph from a InputFile String.
 Returns a ParseError or a Parsed Graph.
 -}
-fromString :: String -> Either String (Graph String String) -- not yet types i and a.
-fromString = undefined      -- should be using Parsec!
+fromString :: String -> Either ParseError (Graph String String) -- not yet types i and a.
+fromString input = parse gkaGraph "(unknown)" $ input
 
-
+gkaGraph :: GenParser Char st (Graph String String)
+gkaGraph = undefined
+{-
+Example:
+#ungerichtet
+v1,v2,5
+v1,v3,10
+v1,v4,9
+v1,v5,20
+v2,v3,11
+v2,v4,12
+v2,v5,15
+v3,v4,2
+v3,v5,20
+v4,v5,18
+-}

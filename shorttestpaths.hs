@@ -149,19 +149,17 @@ myGraph = fromLabels $ M.fromList $
 
 -- maybe also a type decl for shortest path graphs
 
-pathFromShortestPathsGraph :: Graph Int (a, Maybe (Vertex, Int)) -> Vertex -> Graph Int (a, Maybe ([Vertex],Int))
-pathFromShortestPathsGraph gr src = mapVWithKey (fmap . predToPath gr src) $ gr
+findShortestPaths :: Graph Int (a, Maybe (Vertex, Int)) -> Vertex -> Graph Int (a, Maybe ([Vertex],Int))
+findShortestPaths gr src = mapV (fmap $ f) $ gr
 
-predToPath :: Graph Int (a, Maybe (Vertex, Int))    -- graph
-            -> Vertex -- source
-            -> Vertex -- destination
-            -> Maybe (Vertex, Int)
-            -> Maybe ([Vertex], Int)
-predToPath gr src dest Nothing = Nothing
-predToPath gr src dest (Just (pred, dist))
-                    | src == dest = Just ([], 0)
-                    | otherwise = predToPath gr src pred >>=
-                                    \(Just (ps, dists)) -> Just (dest:pred, dists + dist)
+f :: Maybe (Vertex, Int) -> Maybe ([Vertex], Int)
+f = undefined --(>>= findPath gr src)
+
+findPath :: Graph Int (a, Maybe (Vertex, Int))  -- graph
+        -> Vertex -- source
+        -> Vertex -- destination
+        -> Maybe ([Vertex], Int)
+findPath = undefined
 ;
 
 sp1 = dijkstraU 3 myGraph

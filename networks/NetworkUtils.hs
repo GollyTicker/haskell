@@ -3,7 +3,8 @@
 module NetworkUtils
         (
             parsePort,
-            sendLinewise
+            sendLinewise,
+            defaultPort
         )
     where
 ;
@@ -17,4 +18,7 @@ parsePort = PortNumber . fromIntegral . read
 -- commands should be sent by Line
 sendLinewise :: Handle -> IO ()
 sendLinewise handle = hSetBuffering handle LineBuffering
+
+defaultPort :: String
+defaultPort = "50000"
 

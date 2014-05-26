@@ -5,7 +5,7 @@ import Network
 import System.Environment
 import System.IO
 
-import NetworkUtils (parsePort, sendLinewise, defaultPort)
+import NetworkUtils
 
 
 main = withSocketsDo $ do
@@ -23,12 +23,12 @@ main = withSocketsDo $ do
     
     -- receive a line
     recv <- receive
-    putStrLn $ "Recv: " ++ recv
+    showRecv recv
     
     -- send a response
     let toSend = recv
     send toSend
-    putStrLn $ "Sent: " ++ toSend
+    showSent toSend
     
     sClose socket
 ;

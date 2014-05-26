@@ -3,7 +3,7 @@ import Network
 import System.Environment
 import System.IO
 
-import NetworkUtils (parsePort, sendLinewise, defaultPort)
+import NetworkUtils
 
 
 main = do
@@ -19,12 +19,14 @@ main = do
     sendLinewise door
     
     -- send a line
+    putStrLn "Write something..."
     line <- getLine
     send line
+    showSent line
     
     -- receive a line
     recv <- receive
-    putStrLn $ "Got: " ++ recv
+    showRecv recv
     
     hClose door
 ;

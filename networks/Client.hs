@@ -7,8 +7,6 @@ import Control.Monad (unless)
 
 import NetworkUtils
 
--- ghc --make -threaded Client.hs
-
 main = do
     -- read port and server
     args <- getArgs
@@ -30,7 +28,7 @@ repl door =
         send = hPutStrLn door
     in do
         -- read a line
-        putStrLn "Write a line:"
+        putStrLn "Write a line: Quit with \"bye\""
         line <- getLine
         
         -- send a line

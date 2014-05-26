@@ -7,12 +7,9 @@ import System.IO
 import Control.Concurrent
 import GHC.Conc.Sync
 import Data.Char (toLower)
-import Control.Monad (unless)
+import Control.Monad (unless, void)
 
 import NetworkUtils
-
--- ghc --make -threaded Server.hs
-
 
 main = withSocketsDo $ do
     -- read port if given
@@ -22,14 +19,13 @@ main = withSocketsDo $ do
     -- create socket
     socket <- listenOn port
     
-    
-    -- accept a connection
+    while (return True) $ acceptAndFork socket
+;
+
+acceptAndFork :: Socket -> IO ()
+acceptAndFork socket = do
     newConnection <- accept socket
-    threadID <- forkIO (handleNewClient newConnection)
-    
-    while (isRunning threadID) yield
-    
-    sClose socket
+    void $ forkIO (handleNewClient newConnection)
 ;
 
 isRunning :: ThreadId -> IO Bool

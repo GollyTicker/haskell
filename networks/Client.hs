@@ -2,7 +2,8 @@
 import Network
 import System.Environment
 import System.IO
-import NetworkUtils (parsePort)
+
+import NetworkUtils (parsePort, sendLinewise)
 
 
 main = do
@@ -10,8 +11,16 @@ main = do
     let port = parsePort portStr
     -- door :: Handle
     door <- connectTo server port
-    hSetBuffering door LineBuffering    -- commands should be sent by Line
-    getLine >>= hPutStrLn door
+    let receive = hGetLine door
+    let send = hPutStrLn door
+    sendLinewise door
+    
+    line <- getLine
+    send line
+    
+    recv <- receive
+    putStrLn $ "Got: " ++ recv
+    
     hClose door
 ;
 

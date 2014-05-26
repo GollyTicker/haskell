@@ -6,8 +6,11 @@ import System.Environment
 import System.IO
 import Control.Concurrent
 import GHC.Conc.Sync
-import Data.Char (toLower)
+
+import Data.Char (toLower, toUpper)
 import Control.Monad (unless, void)
+import Data.List
+import Data.Maybe
 
 import NetworkUtils
 
@@ -53,16 +56,41 @@ repl door =
         -- receive a line
         recv <- receive
         showRecv recv
+        let tokens = tokenize recv
         
-        let toSend = recv
+        let toSend = process tokens
         send toSend
         showSent toSend
         
         -- recursive call
-        unless (map toLower recv == "bye") (repl door)
+        unless (isBYE tokens) (repl door)
 ;
 
+responders :: [Tokens -> Maybe String]
+responders = [
+                \x -> case x of ["LOWERCASE",strs] -> return $ map toLower strs; _ -> Nothing,
+                \x -> case x of ["UPPERCASE",strs] -> return $ map toUpper strs; _ -> Nothing,
+                \x -> case x of ["BYE"] -> return "BYE"; _ -> Nothing,
+                \x -> return $ "Unrecognized: " ++ showts x
+             ]
+;
 
+process :: Tokens -> String
+process tokens = head . catMaybes $ map ($ tokens) responders
+
+isBYE :: Tokens -> Bool
+isBYE ["BYE"] = True
+isBYE _ = False
+
+showts :: Tokens -> String
+showts ts = intercalate " " ts
+
+type Tokens = [String]
+
+tokenize :: String -> Tokens
+tokenize = filter (not . (' ' `elem`))    -- ["Ok","sdfs","sdf","end!"]
+            . groupBy (\a b -> a /= ' ' && b /= ' ')    -- ["Ok"," ","sdfs"," ","sdf"," "," ","end!"," "] 
+            -- ["Ok","sdfs","sdf","end!"]
 
 fromArgs :: [String] -> PortID
 fromArgs args = parsePort $ case args of

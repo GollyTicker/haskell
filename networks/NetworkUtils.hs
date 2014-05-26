@@ -8,7 +8,8 @@ module NetworkUtils
             showSent,
             showRecv,
             while,
-            allM
+            allM,
+            bye
         )
     where
 ;
@@ -16,6 +17,8 @@ module NetworkUtils
 import Network
 import System.IO
 import Control.Monad
+
+bye = "BYE"
 
 -- StackExchange Haskell (f .) .g 
 (.:) :: (b -> c) -> (a1 -> a2 -> b) -> a1 -> a2 -> c
@@ -37,8 +40,8 @@ parsePort = PortNumber . fromIntegral . read
 sendLinewise :: Handle -> IO ()
 sendLinewise handle = hSetBuffering handle LineBuffering
 
-showRecv recv = putStrLn $ "<- " ++ recv
-showSent sent = putStrLn $ "-> " ++ sent
+showRecv recv = putStrLn $ "-> " ++ recv
+showSent sent = putStrLn $ "<- " ++ sent
 
 
 defaultPort :: String

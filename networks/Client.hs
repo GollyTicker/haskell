@@ -5,6 +5,7 @@ import System.IO
 
 import NetworkUtils
 
+-- ghc --make -threaded Client.hs
 
 main = do
     -- read port and server

@@ -6,6 +6,8 @@ import System.Environment
 import System.IO
 import Control.Concurrent
 import GHC.Conc.Sync
+import Data.Char (toLower)
+import Control.Monad (unless)
 
 import NetworkUtils
 
@@ -40,19 +42,30 @@ isRunning id = do stat <- threadStatus id
 ;
 
 handleNewClient (door, hostname, port) = do
-    let receive = hGetLine door
-    let send = hPutStrLn door
     sendLinewise door
-    
-    -- receive a line
-    recv <- receive
-    showRecv recv
-    
-    -- send a response
-    let toSend = recv
-    send toSend
-    showSent toSend
+    putStrLn $ "New Client: " ++ show door ++ ", " ++ show hostname ++ ", " ++ show port
+    repl door
+    putStrLn "Quit."
 ;
+
+
+repl :: Handle -> IO ()
+repl door = 
+    let receive = hGetLine door
+        send = hPutStrLn door
+    in do
+        -- receive a line
+        recv <- receive
+        showRecv recv
+        
+        let toSend = recv
+        send toSend
+        showSent toSend
+        
+        -- recursive call
+        unless (map toLower recv == "bye") (repl door)
+;
+
 
 
 fromArgs :: [String] -> PortID

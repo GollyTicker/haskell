@@ -2,6 +2,8 @@
 import Network
 import System.Environment
 import System.IO
+import Data.Char (toLower)
+import Control.Monad (unless)
 
 import NetworkUtils
 
@@ -13,25 +15,34 @@ main = do
     let (server, port) = fromArgs args
     
     -- create connection
-    -- door :: Handle
     door <- connectTo server port
-    let receive = hGetLine door
-    let send = hPutStrLn door
     sendLinewise door
     
-    -- send a line
-    putStrLn "Write something..."
-    line <- getLine
-    send line
-    showSent line
-    
-    -- receive a line
-    recv <- receive
-    showRecv recv
+    repl door
+    putStrLn "Quit."
     
     hClose door
 ;
 
+repl :: Handle -> IO ()
+repl door = 
+    let receive = hGetLine door
+        send = hPutStrLn door
+    in do
+        -- read a line
+        putStrLn "Write a line:"
+        line <- getLine
+        
+        -- send a line
+        send line
+        showSent line
+        
+        -- receive a line
+        recv <- receive
+        showRecv recv
+        
+        unless (map toLower line == "bye") $ (repl door)
+;
 
 fromArgs :: [String] -> (HostName, PortID)
 fromArgs args = fmap parsePort $ case args of

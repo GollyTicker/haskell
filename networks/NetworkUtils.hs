@@ -6,13 +6,20 @@ module NetworkUtils
             sendLinewise,
             defaultPort,
             showSent,
-            showRecv
+            showRecv,
+            while
         )
     where
 ;
 
 import Network
 import System.IO
+
+while :: Monad m => m Bool -> m () -> m ()
+while holds f = let go = while holds f
+                in holds >>= \b -> 
+                   if b then f >> go else return ()
+;
     
 parsePort :: String -> PortID
 parsePort = PortNumber . fromIntegral . read

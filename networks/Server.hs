@@ -5,6 +5,7 @@ import Network
 import System.Environment
 import System.IO
 import Control.Concurrent
+import GHC.Conc.Sync
 
 import NetworkUtils
 
@@ -22,11 +23,20 @@ main = withSocketsDo $ do
     
     -- accept a connection
     newConnection <- accept socket
-    forkIO (handleNewClient newConnection)
+    threadID <- forkIO (handleNewClient newConnection)
     
-    threadDelay $ 5*1000*1000
+    while (isRunning threadID) yield
     
     sClose socket
+;
+
+isRunning :: ThreadId -> IO Bool
+isRunning id = do stat <- threadStatus id
+                  return $ case stat of 
+                    ThreadRunning -> True
+                    ThreadFinished -> False
+                    ThreadBlocked reason -> True
+                    ThreadDied -> False
 ;
 
 handleNewClient (door, hostname, port) = do
@@ -43,7 +53,7 @@ handleNewClient (door, hostname, port) = do
     send toSend
     showSent toSend
 ;
-    
+
 
 fromArgs :: [String] -> PortID
 fromArgs args = parsePort $ case args of

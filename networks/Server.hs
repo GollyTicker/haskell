@@ -26,11 +26,14 @@ main = withSocketsDo $ do
     -- create shutdownMsg container
     mvar <- newEmptyMVar
     
+    -- create threadList container
+    tlsMvar <- newEmptyMVar
+    
     putStrLn "Accepting Clients...."
     
     forkerID <- forkFinally (forker socket mvar)
-                (\out -> putStrLn "HELLO CAN YOU HEAR ME" >> putStrLn "sdf" >> case out of
-                    Right res -> putStrLn $ "ThreadFinished with list: " ++ show (length res)
+                (\out -> case out of
+                    Right res -> putStrLn ("Forker got Threads: " ++ show res) >> putMVar tlsMvar res
                     Left exp -> putStrLn "Exception: " >> print exp)
 
     -- until there was no shutdown, keep accepting and forking
@@ -38,10 +41,10 @@ main = withSocketsDo $ do
     
     putStrLn "Killing forker."
     throwTo forkerID UserInterrupt
+    tls <- takeMVar tlsMvar -- blocks until forker is finished
     
     putStrLn "Waiting for Clients to finish."
-    while (isRunning forkerID) yield
-    -- while (fmap (/="QUIT") getLine) yield
+    while (existsM isRunning tls) yield
 ;
 
 
@@ -54,14 +57,9 @@ forker socket mvar = let go = forker socket mvar
                                 [] -> return []
                                 id:_ -> fmap (id:) go
 ;
-        {-fmap (concat . takeWhile (not . null)) 
-                     . sequence
-                     . repeat
-                     $ forkOrBreak socket mvar-}
-
 forkOrBreak :: Socket -> MVar () -> IO [ThreadId]
 forkOrBreak socket mvar = (fmap (:[]) $ acceptAndFork socket mvar)
-                          `catch` ( (const $ putStrLn "Stopping now." >> return []) :: AsyncException -> IO [ThreadId] )
+                          `catch` ( (const $ return []) :: AsyncException -> IO [ThreadId] )
 
 acceptAndFork :: Socket -> MVar () -> IO ThreadId
 acceptAndFork socket mvar = do

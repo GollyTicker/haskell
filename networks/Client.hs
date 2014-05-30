@@ -29,18 +29,17 @@ repl door =
         send = hPutStrLn door
     in do
         -- read a line
-        putStrLn "Write a line: Quit with \"BYE\""
+        putStrLn "Write a line: Quit with \"BYE\" or \"SHUTDOWN\""
         line <- getLine
         
         -- send a line
         send line
-        -- showSent line
         
         -- receive a line
         recv <- receive
         showRecv recv
         
-        unless (line == "BYE") $ (repl door)
+        unless (line == "BYE" || line == "SHUTDOWN") $ (repl door)
 ;
 
 fromArgs :: [String] -> (HostName, PortID)

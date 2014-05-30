@@ -6,9 +6,10 @@ import System.Environment
 import System.IO
 import Control.Concurrent
 import GHC.Conc.Sync
+import Control.Exception
 
 import Data.Char (toLower, toUpper)
-import Control.Monad (unless, void)
+import Control.Monad (unless, void, when)
 import Data.List
 import Data.Maybe
 
@@ -22,13 +23,50 @@ main = withSocketsDo $ do
     -- create socket
     socket <- listenOn port
     
-    while (return True) $ acceptAndFork socket
+    -- create shutdownMsg container
+    mvar <- newEmptyMVar
+    
+    putStrLn "Accepting Clients...."
+    
+    forkerID <- forkFinally (forker socket mvar)
+                (\out -> putStrLn "HELLO CAN YOU HEAR ME" >> putStrLn "sdf" >> case out of
+                    Right res -> putStrLn $ "ThreadFinished with list: " ++ show (length res)
+                    Left exp -> putStrLn "Exception: " >> print exp)
+
+    -- until there was no shutdown, keep accepting and forking
+    while (isEmptyMVar mvar) yield
+    
+    putStrLn "Killing forker."
+    throwTo forkerID UserInterrupt
+    
+    putStrLn "Waiting for Clients to finish."
+    while (isRunning forkerID) yield
+    -- while (fmap (/="QUIT") getLine) yield
 ;
 
-acceptAndFork :: Socket -> IO ()
-acceptAndFork socket = do
+
+forker :: Socket -> MVar () -> IO [ThreadId]
+forker socket mvar = let go = forker socket mvar
+                      in
+                        do
+                            ids <- forkOrBreak socket mvar
+                            case ids of
+                                [] -> return []
+                                id:_ -> fmap (id:) go
+;
+        {-fmap (concat . takeWhile (not . null)) 
+                     . sequence
+                     . repeat
+                     $ forkOrBreak socket mvar-}
+
+forkOrBreak :: Socket -> MVar () -> IO [ThreadId]
+forkOrBreak socket mvar = (fmap (:[]) $ acceptAndFork socket mvar)
+                          `catch` ( (const $ putStrLn "Stopping now." >> return []) :: AsyncException -> IO [ThreadId] )
+
+acceptAndFork :: Socket -> MVar () -> IO ThreadId
+acceptAndFork socket mvar = do
     newConnection <- accept socket
-    void $ forkIO (handleNewClient newConnection)
+    forkIO (handleNewClient newConnection mvar)
 ;
 
 isRunning :: ThreadId -> IO Bool
@@ -40,40 +78,48 @@ isRunning id = do stat <- threadStatus id
                     ThreadDied -> False
 ;
 
-handleNewClient (door, hostname, port) = do
+handleNewClient (door, hostname, port) mvar = do
     sendLinewise door
     putStrLn $ "New Client: " ++ show door ++ ", " ++ show hostname ++ ", " ++ show port
-    repl door
-    putStrLn "Quit."
+    repl door mvar
+    putStrLn $ "Quit Client:" ++ show door
 ;
 
 
-repl :: Handle -> IO ()
-repl door = 
+repl :: Handle -> MVar ()-> IO ()
+repl door mvar = 
     let receive = hGetLine door
         send = hPutStrLn door
-    in do
-        -- receive a line
-        recv <- receive
-        showRecv recv
-        let tokens = tokenize recv
-        
-        let toSend = process tokens
-        send toSend
-        showSent toSend
-        
-        -- recursive call
-        unless (isBYE tokens) (repl door)
+        shutdownMsg = tryPutMVar mvar () >> putStrLn "Received Shutdown"
+        loop = do
+                -- receive a line
+                recv <- receive
+                showRecv recv
+                let tokens = tokenize recv
+                
+                let toSend = process tokens
+                send toSend
+                showSent toSend
+                
+                -- send shutdown to the main thread if the server is to be shutdown
+                when (isShutdown tokens) shutdownMsg
+                
+                -- recursive call
+                unless (isBYE tokens || isShutdown tokens) loop
+    in loop
 ;
 
 responders :: [Tokens -> Maybe String]
 responders = [
                 \x -> case x of ["LOWERCASE",strs] -> return $ map toLower strs; _ -> Nothing,
                 \x -> case x of ["UPPERCASE",strs] -> return $ map toUpper strs; _ -> Nothing,
+                \x -> case x of ["REVERSE",strs] -> return $ reverse strs; _ -> Nothing,
+                \x -> case x of ["SHUTDOWN"] -> return "SHUTDOWN"; _ -> Nothing,
                 \x -> case x of ["BYE"] -> return "BYE"; _ -> Nothing,
-                \x -> return $ "Unrecognized: " ++ showts x
+                \x -> return $ "Unknown Command: " ++ showts x
              ]
 ;
+
 
 process :: Tokens -> String
 process tokens = head . catMaybes $ map ($ tokens) responders
@@ -82,15 +128,19 @@ isBYE :: Tokens -> Bool
 isBYE ["BYE"] = True
 isBYE _ = False
 
+isShutdown :: Tokens -> Bool
+isShutdown ["SHUTDOWN"] = True
+isShutdown _ = False
+
 showts :: Tokens -> String
 showts ts = intercalate " " ts
 
 type Tokens = [String]
 
 tokenize :: String -> Tokens
-tokenize = filter (not . (' ' `elem`))    -- ["Ok","sdfs","sdf","end!"]
+tokenize = filter (not . (' ' `elem`))                  -- ["Ok","sdfs","sdf","end!"]
             . groupBy (\a b -> a /= ' ' && b /= ' ')    -- ["Ok"," ","sdfs"," ","sdf"," "," ","end!"," "] 
-            -- ["Ok","sdfs","sdf","end!"]
+                                                        -- "Ok sdfs sdf  end! "
 
 fromArgs :: [String] -> PortID
 fromArgs args = parsePort $ case args of

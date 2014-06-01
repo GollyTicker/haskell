@@ -30,9 +30,8 @@ while holds f = let go = while holds f
                    if b then f >> go else return ()
 ;
 
--- wtf, GHC removed Functor typeclass constriant for Monads.
-existsM :: (Functor m, Monad m) => (a -> m Bool) -> [a] -> m Bool
-existsM f ls = fmap not $ allM (fmap not . f) ls
+existsM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+existsM f ls = liftM not $ allM (liftM not . f) ls
 
 allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 allM f = foldM (\a b -> f b >>= (\b -> return (a && b))) True

@@ -7,6 +7,7 @@ import Control.Applicative
 import Control.Exception.Base
 import Control.DeepSeq
 import System.Time
+import System.Environment
 -- import Acme.Omitted -- cannot use because no profiling libs installed :(
 
 
@@ -46,7 +47,6 @@ indices dim = (,) <$> [0..dim-1] <*> [0..dim-1]
 
 
 -- (A*B) i j = sum (k, 1 to m, A i k * B k j)
-
 smult :: Matrix -> Matrix -> Matrix
 mat1 `smult` mat2
         | n /= dim mat2 = error "Unequal size"
@@ -58,26 +58,9 @@ mat1 `smult` mat2
                 n = dim mat1
 ;
 
+calc d = plusMat d `smult` plusMat d
 
-withNF :: NFData a => a -> b
-withNF a = undefined
-
--- measure :: NFData a => a -> IO Integer
-measure a | False = withNF a    -- adding nfdata constrint without having to fully quantify type of "measure"
-measure a = do
-    x <- getClockTime
-    Control.Exception.Base.evaluate (a `deepseq` 1)
-    y <- getClockTime
-    return $ (`div` 10^9) . tdPicosec $ diffClockTimes y x  -- convert to ms
-;
-
-
-
-
-calc = let d = 300 in plusMat d `smult` plusMat d
-
-main = measure calc >>= \ms -> putStrLn $ show ms ++ " ms"
-
+main = getArgs >>= \[n] -> evaluate $ calc (read n) `deepseq` ()
 
 idMat = fromGen (\i j -> if i == j then 1 else 0)
 zeroMat = fromGen (const . const $ 0)

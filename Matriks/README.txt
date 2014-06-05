@@ -1,7 +1,6 @@
 
--- ghc -O2 --make Main.hs -prof -auto-all -caf-all -fforce-recomp
-
--- cmd> Main.exe $0 +RTS -p
+Run $ makeAndRun.bat <n>
+See the results in Main.prof
 
 However, if you dont have profiling versions of the haskell libraries, then -prof won't compile.
 
@@ -13,3 +12,6 @@ $ cabal install <package> --enable-tests --enable-library-profiling
 
 You may also have to reinstall there and other names packages.
 
+
+TODO: write the profiling actions not in batch...
+* Call Main with all the different multiplications and save profiling files for each of them.

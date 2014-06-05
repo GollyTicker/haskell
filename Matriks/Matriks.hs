@@ -5,7 +5,8 @@ module Matriks
         fromGen,
         idMat,zeroMat,plusMat,someMat,
         at,
-        smult, cmult, stmult, pmult, qmult, dmult
+        smult, cmult, stmult, pmult, qmult, dmult,
+        mults
     )
     where
 
@@ -14,6 +15,7 @@ import Control.DeepSeq
 import Data.Map.Strict hiding (map)
 import Control.Applicative ((<$>), (<*>))
 import Data.List
+import Acme.Omitted
 
 -- ============================== Matrix Data Definition And Instances =========================
 
@@ -93,24 +95,28 @@ mat1 `smult` mat2 | n /= dim mat2 = error "Unequal size"
 
 -- multiplying with a different strategy than simply using wikipedias definition
 dmult :: Matrix -> Matrix -> Matrix
-dmult = undefined
+dmult = const
 
 -- multiplying by strassens algorithm
 stmult :: Matrix -> Matrix -> Matrix
-stmult = undefined
+stmult = const
 
 -- multiplying by delegating to C
 -- the matrix can(and needs to be) be sent to the C program in linear time, because Data.Map supporst lin. time list fusioned "toAscList"
 cmult :: Matrix -> Matrix -> Matrix
-cmult = undefined
+cmult = const
 
 -- parallel mult of wikipedias mult definition
 pmult :: Matrix -> Matrix -> Matrix
-pmult = undefined
+pmult = const
 
 -- mult using vectors? fast mutable arrays. but then we need a slightly different matrix impl.
 qmult :: Matrix -> Matrix -> Matrix
-qmult = undefined
+qmult = const
+
+mults = [smult, dmult, stmult, cmult, pmult, qmult]
+
+myFunc = (...)
 
 -- ==================== MISC ===========================
 

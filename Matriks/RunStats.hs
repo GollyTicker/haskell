@@ -22,6 +22,8 @@ import Data.List
 import Control.Exception
 import Data.Maybe
 import Debug.Trace
+import Control.Applicative
+import Control.Arrow
 
 configFile = "config.hd"
 
@@ -39,17 +41,31 @@ main = do
     deleteFile "*.o *.hi"
     
     putStrLn $ "Reading " ++ configFile ++ " ..."
-    sNum <- fmap read $ readFile configFile
-    let (args,sargs) = ([0..sNum], map show args)
-    evaluate ([0..sNum] :: [Int])
+    (dims, multIDs) <- fromConfigFile
     
-    forM_ sargs $ \n -> do
-        -- run with all the numbers
-        runFile pureFileName [n, "+RTS", "-p", "-hc","-K100M"]
-        -- save .prof file
-        renameFile ".prof" pureFileName n
-        renameFile ".hp" pureFileName n
-        system $ "hp2ps -e8in -c -i4 " ++ pureFileName ++ n ++  ".hp"
+    let combs = (\a b -> (show a, show b)) <$> dims <*> multIDs
+    
+    mapM_ (\(n,mid) -> execCase n mid pureFileName) combs
+;
+
+execCase :: String -> String -> String -> IO ()
+execCase n multId pfile = do
+    runFile pfile $ [n, multId, "+RTS", "-p", "-hc","-K100M"]
+    
+    let conf = concat ["-",n,"-",multId]
+    
+    renameFile ".prof" pfile conf
+    renameFile ".hp" pfile conf
+    void $ system $ concat ["hp2ps -e8in -c -i4 ",pfile,conf,".hp"]
+
+
+fromConfigFile :: IO ([Int], [Int])
+fromConfigFile = do
+    configsRaw <- readFile configFile
+    let configs = (read configsRaw) :: [(String, String)]
+    let dims = read . snd . head . filter (("matDims"==) . fst) $ configs
+        multIDs = (\n -> [0..n-1]) . read . snd . head . filter (("mults"==) . fst) $ configs
+    return (dims, multIDs)
 ;
 
 runFile :: FilePath -> [String] -> IO ()

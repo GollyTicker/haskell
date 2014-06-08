@@ -1,6 +1,7 @@
 module Matriks
     (
-        Matrix(..),
+        Matrix,
+        dim, matrix,
         Idx, Elem,
         fromGen,
         idMat,zeroMat,plusMat,someMat,
@@ -16,6 +17,28 @@ import Data.Map.Strict hiding (map)
 import Control.Applicative ((<$>), (<*>))
 import Data.List
 import Acme.Omitted
+import Test.QuickCheck
+
+
+
+instance Arbitrary Matrix where
+    arbitrary = matGen
+    shrink = (...)
+;
+
+matGen :: Gen Matrix
+matGen = choose (0,15) >>= matGenDim
+
+matGenDim :: Int -> Gen Matrix
+matGenDim dim = do i <- arbitrary; j <- arbitrary; 
+    where
+        f :: Int -> Int -> Gen Int
+        f = curry $ toFunction combs (repeat $ aribitrary :: Gen Int)
+        combs = (,) <$> [0..dim-1] <*> [0..dim-1]
+;
+
+toFunction :: [(a,b)] -> a -> b
+toFunction ls = \a -> snd . head . filter (==a) $ ls
 
 -- ============================== Matrix Data Definition And Instances =========================
 
@@ -50,7 +73,6 @@ Matrix 6
   3   4   5   6   7   8
   4   5   6   7   8   9
   5   6   7   8   9  10
-
 -}
 
 
@@ -95,24 +117,24 @@ mat1 `smult` mat2 | n /= dim mat2 = error "Unequal size"
 
 -- multiplying with a different strategy than simply using wikipedias definition
 dmult :: Matrix -> Matrix -> Matrix
-dmult = const
+dmult = smult
 
 -- multiplying by strassens algorithm
 stmult :: Matrix -> Matrix -> Matrix
-stmult = const
+stmult = smult
 
 -- multiplying by delegating to C
 -- the matrix can(and needs to be) be sent to the C program in linear time, because Data.Map supporst lin. time list fusioned "toAscList"
 cmult :: Matrix -> Matrix -> Matrix
-cmult = const
+cmult = smult
 
 -- parallel mult of wikipedias mult definition
 pmult :: Matrix -> Matrix -> Matrix
-pmult = const
+pmult = smult
 
 -- mult using vectors? fast mutable arrays. but then we need a slightly different matrix impl.
 qmult :: Matrix -> Matrix -> Matrix
-qmult = const
+qmult = smult
 
 mults = [smult, dmult, stmult, cmult, pmult, qmult]
 

@@ -1,6 +1,5 @@
 
-Run $ makeAndRun.bat <n>
-See the results in Main.prof
+Run $ RunStats.exe
 
 However, if you dont have profiling versions of the haskell libraries, then -prof won't compile.
 

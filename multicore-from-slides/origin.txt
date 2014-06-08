@@ -1,1 +1,0 @@
-http://www.scribd.com/doc/19465418/Multicore-Programming-in-Haskell-Now

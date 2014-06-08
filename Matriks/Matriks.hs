@@ -60,11 +60,22 @@ Matrix 6
 
 -- builds a Matrix from a Generator function
 fromGen :: (Idx -> Idx -> Int) -> Int -> Matrix
-fromGen f dim = let ks = (,) <$> [0..dim-1] <*> [0..dim-1]
-                    mat = fromAscList $ map (\k -> (k, uncurry f k)) ks -- fromAscList is linear (+ subject to list fusion)
+fromGen f dim = let mat = fromAscList $ combs (\i j -> ((i,j), f i j)) dim -- fromAscList is linear (+ subject to list fusion)
                 in Matrix dim mat
 ;
 
+combs :: (Int -> Int -> a) -> Int -> [a]
+combs f dim = f <$> [0..dim-1] <*> [0..dim-1]
+
+-- builda matrix form the list of values. The size of the list has to be a square number
+fromValues :: [Int] -> Int -> Matrix
+fromValues vs dim
+    | isWhole . sqrt . fromIntegral $ length vs = fromGen (\i j -> vs !! (i + dim * j)) dim
+    | otherwise = error "size not a square number"
+;
+
+isWhole x | False = True    -- this line makes me specify that the result is boolean without naming the concrete signature
+isWhole x | otherwise = x == fromIntegral (round x)
 -- identity matrix, zero matrix and two sample ones. makes haskell beautiful
 idMat, zeroMat, plusMat, someMat :: Int -> Matrix
 

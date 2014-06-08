@@ -5,7 +5,7 @@
 
 --for forcing evaluation
 import Control.Exception.Base
-import Control.Deepseq
+import Control.DeepSeq
 
 import Control.Parallel -- not yet used
 
@@ -18,7 +18,7 @@ import Matriks
 
 
 -- the calculation to be measured
-workload d multId = mults !! multId (plusMat d) (plusMat d)
+workload d multId = (mults !! multId) (plusMat d) (plusMat d)
 
 -- read matrix dimension from shell arguments and calculate workload
 main = getArgs >>= \xs -> case xs of [n,multId] -> evaluate $ workload (read n) (read multId) `deepseq` (); _ -> putStrLn "Usage: main.exe <n> +RTS -p"

@@ -20,26 +20,6 @@ import Acme.Omitted
 import Test.QuickCheck
 
 
-
-instance Arbitrary Matrix where
-    arbitrary = matGen
-    shrink = (...)
-;
-
-matGen :: Gen Matrix
-matGen = choose (0,15) >>= matGenDim
-
-matGenDim :: Int -> Gen Matrix
-matGenDim dim = do i <- arbitrary; j <- arbitrary; 
-    where
-        f :: Int -> Int -> Gen Int
-        f = curry $ toFunction combs (repeat $ aribitrary :: Gen Int)
-        combs = (,) <$> [0..dim-1] <*> [0..dim-1]
-;
-
-toFunction :: [(a,b)] -> a -> b
-toFunction ls = \a -> snd . head . filter (==a) $ ls
-
 -- ============================== Matrix Data Definition And Instances =========================
 
 -- use Map as data structure for the square matrices

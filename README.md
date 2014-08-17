@@ -1,4 +1,4 @@
 haskell
 =======
 
-d( o.o)b    Stuff I did in Haskell
+d( o.o)b    Some Haskell Stuff

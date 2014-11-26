@@ -58,7 +58,7 @@ reviser = do
     changes <- replicateM (length cs) checkSingleConstraint
     (newnet, _) <- get
     if any (==True) changes
-        then reviser
+        then modify (\(n,_) -> (n,cs)) >> reviser
         else return newnet
     
 checkSingleConstraint :: StateT S IO Bool
@@ -75,7 +75,7 @@ checkSingleConstraint =
                     ns' = replaceNode n1 n1' ns
                     newnet = Net ns' net_cs
                 in
-                    when True
+                    when changed
                         (lift (putStrLn $ s1 ++ " vs " ++ s2 ++ ": " ++ show n1 ++ " -> " ++ show n1'))
                     >> put (newnet, cs')
                     >> return changed

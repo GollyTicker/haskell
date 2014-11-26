@@ -1,6 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 
-
-import Control.Applicative
 import Control.Monad.State.Strict
 import Control.Monad (replicateM)
 import Data.List (find)
@@ -8,49 +7,51 @@ import Data.Maybe (fromJust)
 import Debug.Trace
 
 -- Ein Knoten besteht aus seinem Namen sowie aus dessen Domainmenge
-type Node = (String, Domain)
-type Domain = [Int] -- Die Domain ist stehts Int
+type Node a = (String, Domain a)
+type Domain a = [a] -- Die Domain ist vom Typ a
 
-data Net = Net [Node] [Constraint] deriving Show
+-- Net a ist ein Constraint Netz dessen Werte Elemente vom Typ a haben können.
+data Net a = Net [Node a] [Constraint a] deriving Show
 
 -- Ein Constraint ist eine unäre/binäry Funktion die ein Node nimmt
 -- und ein Node zurückliefert, bei dem fehlerhafte Elemente aus der Domain entfernt wurden.
 -- Bei binären Constraints werden für Elemente der ersten Menge Partner in der Zweiten gesucht.
 -- Es wird eine Modifikation des ersten Knoten zurückgeliefert sowie ein Bool das eine Änderung makiert.
 -- Die Funktionen liefern beim Aufruf auf irrelevante Knoten den gleichen Knoten zurück.
-data Constraint =
+data Constraint a =
     Binary
         String -- name des Constraints
         String -- name des zweiten Knotens
         String -- name des ersten Knotens
-        (Node -> Node -> (Node, Bool)) -- Funktion
-        (Int -> Int -> Bool) -- Kopie der originalen Funktion
+        (Node a -> Node a -> (Node a, Bool)) -- Funktion
+        (a -> a -> Bool) -- Kopie der originalen Funktion
     
-instance Show Constraint where
+instance Show (Constraint a) where
     show (Binary s _ _ _ _) = "Binary " ++ s
 
-constraint :: (Int -> Int -> Bool) -> String-> String -> String -> Constraint
+constraint :: Eq a => (a -> a -> Bool) -> String-> String -> String -> Constraint a
 constraint f name s1 s2 = Binary name s1 s2 g f
     where
-        g :: Node -> Node -> (Node, Bool) -- dies hier ist eine Implementation des REVISE Algorithmus
+     -- g :: Node -> Node -> (Node, Bool)
         g xNode@(x',xs) (y',ys)
                 | x' == s1 && y' == s2 =
-                    let xs' = [ x | x <- xs, any (\y -> f x y) ys]
+                    let xs' = [ x | x <- xs, any (\y -> f x y) ys] -- dies hier ist eine Implementation des REVISE Algorithmus
                     in ( (x', xs'), xs' /= xs )
                 | otherwise = (xNode, False)
 
--- arcconsistency1 :: Net -> Net
+arcconsistency1 :: (Eq a, Show a) => Net a -> IO (Net a)
 arcconsistency1 net@(Net ns cs) = result
     where
-        result = ns' -- Net ns' cs
-        queue :: [Constraint]
+        result = ns'
+     -- queue :: [Constraint a]
         queue = concatMap (\c -> [c, flop c]) cs
         ns' = evalStateT reviser (net, queue)
 
-type S = (Net, [Constraint])
+-- St a is the type used in the stateful computation.
+type S a = (Net a, [Constraint a])
 
 -- implementing AC1
-reviser :: StateT S IO Net
+reviser :: Show a => StateT (S a) IO (Net a)
 reviser = do
     (net, cs) <- get
     lift $ putStr "Iteration: "
@@ -61,7 +62,7 @@ reviser = do
         then modify (\(n,_) -> (n,cs)) >> reviser
         else return newnet
     
-checkSingleConstraint :: StateT S IO Bool
+checkSingleConstraint :: Show a => StateT (S a) IO Bool
 checkSingleConstraint = 
     do
         ((Net ns net_cs), cs) <- get
@@ -81,28 +82,27 @@ checkSingleConstraint =
                     >> return changed
 
 -- replaces first occurrence of x in the list by y
-replaceNode :: Node -> Node -> [Node] -> [Node]
+replaceNode :: Node a -> Node a -> [Node a] -> [Node a]
 replaceNode x y [] = error "Not found in replace" 
 replaceNode x y (b:bs)
     | fst b == fst x = y:bs
     | otherwise = b : replaceNode x y bs
 
-equals :: String -> String -> Constraint
+equals :: String -> String -> Constraint Int
 equals x y = constraint (==) (show x ++ " == " ++ show y) x y
 
-mult2equals :: String -> String -> Constraint
+mult2equals :: String -> String -> Constraint Int
 mult2equals x y = constraint (\x y -> x*2 == y) (show x ++ " *2 == " ++ show y) x y
 
-smallerThan :: String -> String -> Constraint
+smallerThan :: String -> String -> Constraint Int
 smallerThan x y = constraint (<) (show x ++ " < " ++ show y) x y
 
-flop :: Constraint -> Constraint
+flop :: (Show a, Eq a) => Constraint a -> Constraint a
 flop (Binary name s1 s2 c f) = constraint (flip f) name s2 s1
 
+net :: Net Int
 net = Net
         [ ("V", [1,2,3,4]), ("X", [1,2,3,4]), ("Y", [1,2,3,4]), ("Z", [1,2,3,4]) ]
         [ "X" `equals` "V" , "X" `mult2equals` "Z", "X" `smallerThan` "Y", "Y" `equals` "Z" ]
-
-
 
 

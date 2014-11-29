@@ -137,19 +137,4 @@ mult2equals x y = constraint (\x y -> x*2 == y) (show x ++ " *2 == " ++ show y) 
 flop :: Constraint -> Constraint
 flop (Binary name s1 s2 c f) = mkConstraint s1 (flip f) s2 name
 
-nums :: Domain Int
-nums = [1,2,3,4]
-
-net :: Net
-net = Net
-        [
-            Node "V" nums,
-            Node "X" nums,
-            Node "Y" nums,
-            Node "Z" nums
-        ]
-        [
-           (mkConstraint :: Over Int) "X" (<) "Y" "X < Y"
-        ]
-
 

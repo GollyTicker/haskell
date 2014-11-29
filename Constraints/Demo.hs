@@ -1,5 +1,6 @@
+{-# LANGUAGE FlexibleContexts, ConstraintKinds #-}
 
-import Constraints
+import ConstraintSolving
 
 nums :: Domain Int
 nums = [1,2,3,4]
@@ -7,10 +8,10 @@ nums = [1,2,3,4]
 net :: Net
 net = Net
         [
-            Node "V" nums,
-            Node "X" nums,
-            Node "Y" nums,
-            Node "Z" nums
+            var "V" nums,
+            var "X" nums,
+            var "Y" nums,
+            var "Z" nums
         ]
         [
            (mkConstraint :: Over Int) "X" (<) "Y" "X < Y"

@@ -1,6 +1,13 @@
 {-# LANGUAGE RankNTypes, ExistentialQuantification, ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts, ConstraintKinds #-}
 
+module ConstraintSolving (
+        Net(..), Constraint, Node,
+        Domain, NodeName,
+        var, mkConstraint, Elem, Over,
+    )
+    where
+
 import Control.Monad.State.Strict
 import Control.Monad (replicateM)
 import Data.List (find)
@@ -11,6 +18,12 @@ import Data.Typeable
 -- Ein Knoten besteht aus seinem Namen sowie aus dessen Domain an besetzbaren Werten
 data Node = forall a. Elem a =>
                 Node NodeName (Domain a)
+
+var :: Elem a => NodeName -> Domain a -> Node
+var = Node
+
+name :: Node -> NodeName
+name (Node s _) = s
 
 type Domain a = [a]
 type NodeName = String
@@ -32,7 +45,7 @@ type Elem a = (Show a, Typeable a)
 data Constraint =
     forall a. Elem a =>
         Binary {
-            name   :: String, -- Name of Constraint
+            cName  :: String,   -- Name of Constraint
             first  :: NodeName, -- Name of first Node
             second :: NodeName, -- Name of second Node
             over   :: Node -> Node -> (Node, Bool),
@@ -43,7 +56,7 @@ data Constraint =
         }
 
 instance Show Constraint where
-    show c = "Binary " ++ name c
+    show c = "Binary " ++ cName c
 
 generalize ::
     (Typeable a, Typeable b, Typeable c) =>
@@ -119,20 +132,15 @@ checkSingleConstraint =
                             (lift (putStrLn $ s1 ++ " vs " ++ s2 ++ ": " ++ show n1 ++ " -> " ++ show n1'))
                         put (newnet, cs')
                         return changed
+-}
 
 -- replaces first occurrence of x in the list by y
-replaceNode :: Node a -> Node a -> [Node a] -> [Node a]
+replaceNode :: Node -> Node -> [Node] -> [Node]
 replaceNode x y [] = error "Not found in replace" 
 replaceNode x y (b:bs)
-    | fst b == fst x = y:bs
+    | name b == name x = y:bs
     | otherwise = b : replaceNode x y bs
 
-equals :: String -> String -> Constraint Int
-equals x y = constraint (==) (show x ++ " == " ++ show y) x y
-
-mult2equals :: String -> String -> Constraint Int
-mult2equals x y = constraint (\x y -> x*2 == y) (show x ++ " *2 == " ++ show y) x y
--}
 
 flop :: Constraint -> Constraint
 flop (Binary name s1 s2 c f) = mkConstraint s1 (flip f) s2 name

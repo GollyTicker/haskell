@@ -29,21 +29,21 @@ data Constraint a =
 instance Show (Constraint a) where
     show (Binary s _ _ _ _) = "Binary " ++ s
 
-constraint :: Eq a => (a -> a -> Bool) -> String-> String -> String -> Constraint a
+constraint :: forall a. Eq a => (a -> a -> Bool) -> String-> String -> String -> Constraint a
 constraint f name s1 s2 = Binary name s1 s2 g f
     where
-     -- g :: Node -> Node -> (Node, Bool)
+        g :: Node a -> Node a -> (Node a, Bool)
         g xNode@(x',xs) (y',ys)
                 | x' == s1 && y' == s2 =
                     let xs' = [ x | x <- xs, any (\y -> f x y) ys] -- dies hier ist eine Implementation des REVISE Algorithmus
                     in ( (x', xs'), xs' /= xs )
                 | otherwise = (xNode, False)
 
-arcconsistency1 :: (Eq a, Show a) => Net a -> IO (Net a)
+arcconsistency1 :: forall a. (Eq a, Show a) => Net a -> IO (Net a)
 arcconsistency1 net@(Net ns cs) = result
     where
         result = ns'
-     -- queue :: [Constraint a]
+        queue :: [Constraint a]
         queue = concatMap (\c -> [c, flop c]) cs
         ns' = evalStateT reviser (net, queue)
 
@@ -76,10 +76,11 @@ checkSingleConstraint =
                     ns' = replaceNode n1 n1' ns
                     newnet = Net ns' net_cs
                 in
-                    when changed
-                        (lift (putStrLn $ s1 ++ " vs " ++ s2 ++ ": " ++ show n1 ++ " -> " ++ show n1'))
-                    >> put (newnet, cs')
-                    >> return changed
+                    do
+                        when changed
+                            (lift (putStrLn $ s1 ++ " vs " ++ s2 ++ ": " ++ show n1 ++ " -> " ++ show n1'))
+                        put (newnet, cs')
+                        return changed
 
 -- replaces first occurrence of x in the list by y
 replaceNode :: Node a -> Node a -> [Node a] -> [Node a]

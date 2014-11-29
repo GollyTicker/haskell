@@ -58,37 +58,39 @@ mylist = [
      ]
 
 
-
 -- ImpredicativeTypes
 data Bi = forall a. Typeable a =>
             Bi
                 String -- name der funktion
                 -- constraintvergleichfunktion
-                (forall b. Typeable b => a -> b -> Bool)
+                (forall b c. (Typeable b, Typeable c) => b -> c -> Bool)
                 (a -> a -> Bool) -- originale Funktion
 
 instance Show Bi where show (Bi s _ _) = s
 
 list :: [Bi]
 list = [
-    constraint "eq"  ( (==) :: Char   -> Char     -> Bool ),
-    constraint "neq" ( (/=) :: String -> String   -> Bool ),
-    constraint "lt"  (  (<) :: Int    -> Int      -> Bool )
+    mkConstraint "eq"  ( (==) :: Char   -> Char     -> Bool ),
+    mkConstraint "neq" ( (/=) :: String -> String   -> Bool ),
+    mkConstraint "lt"  (  (<) :: Int    -> Int      -> Bool )
     ]
 
-constraint :: Typeable a => String -> (a -> a -> Bool) -> Bi
-constraint s f = Bi s (make f) f
+mkConstraint :: Typeable a => String -> (a -> a -> Bool) -> Bi
+mkConstraint s f = Bi s (generalize f) f
 
 a :: Bi
-a = Bi "" (make eqInt) eqInt
-    where
-        eqInt :: (Int -> Int -> Bool)
-        eqInt = (==)
+a = Bi "" (generalize eqInt) eqInt
+    where eqInt :: (Int -> Int -> Bool)
+          eqInt = (==)
 
 -- typeconvert from any type and test
-make :: (Typeable a, Typeable b) =>  (a -> a -> Bool) -> a -> b -> Bool
-make f a tb = maybe False (\a' -> f a a') (cast tb)
-
+generalize ::
+    (Typeable a, Typeable b, Typeable c) =>
+    (a -> a -> Bool)
+    -> b -> c -> Bool
+generalize f b c = case (cast b, cast c) of
+        (Just a, Just a') -> f a a'
+        _ -> True
 
 -- typeconvert to int and test
 ss :: Typeable b =>  (Int -> Int -> Bool) -> b -> b -> Bool
@@ -97,8 +99,8 @@ ss f tb tb' = case (cast tb, cast tb') of
             _ -> False
 
 data Elem = forall a. (Show a, Typeable a) => Elem a
-instance Show Elem where
-    show (Elem a) = show a
+
+instance Show Elem where show (Elem a) = show a
 
 ls :: [Elem]
 ls = [Elem (5::Int), Elem "sdf", Elem 'c', Elem "s", Elem (6::Int)]
@@ -113,12 +115,6 @@ main = mapM_ print results
         results = pairs ls list f
         f :: Elem -> Elem -> Bi -> String
         f (Elem a) (Elem b) (Bi s c g) = 
-            printf "%s %s %s => %s" (show a) s (show b) (c a b)
+            show a ++ " " ++ s ++ " " ++ show b ++ " => " ++ show (c a b)
 
--- next step:
--- make this last call in main work.
--- currently only the type b in Bi(...) is universally quantified.
--- Now I have to make sure, the type a is also universally quantified
--- but still bound to the original function in Bi(...)
--- With this, I can simply extract the comparing funciton from Bi(...)
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables, ExistentialQuantification #-}
 
 -- http://stackoverflow.com/questions/3071136/what-does-the-forall-keyword-in-haskell-ghc-do
-
+-- playing with universal quantification
 
 import Data.Typeable
 import Text.Printf

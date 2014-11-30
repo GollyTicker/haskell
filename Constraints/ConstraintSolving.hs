@@ -4,7 +4,7 @@
 module ConstraintSolving (
         Net(..), Constraint, Node,
         Domain, NodeName,
-        var, mkConstraint, Elem, Over,
+        var, mkConstraint, Elem, Over, On
     )
     where
 
@@ -43,38 +43,37 @@ f :: Elem a => ...
 type Elem a = (Show a, Typeable a)
 
 data Constraint =
-    forall a. Elem a =>
-        Binary {
-            cName  :: String,   -- Name of Constraint
-            first  :: NodeName, -- Name of first Node
-            second :: NodeName, -- Name of second Node
-            over   :: Node -> Node -> (Node, Bool),
+    forall a b. (Elem a, Elem b) =>
+        Binary
+            String   -- Name of Constraint
+            NodeName -- Name of first Node
+            NodeName -- Name of second Node
+            (Node -> Node -> (Node, Bool))
                 -- funciton to run the constraint on two arbitrary nodes.
                 -- if it returns false, then the constraint was violated.
-            getConstraint :: (a -> a -> Bool)
+            (a -> b -> Bool)
                 -- a copy of the original constrain on the original type
-        }
 
 instance Show Constraint where
-    show c = "Binary " ++ cName c
+    show (Binary c _ _ _ _) = "Binary " ++ c
 
 generalize ::
-    (Typeable a, Typeable b, Typeable c) =>
-    (a -> a -> Bool) -- original simple polymorphic function
-    -> b -> c -> Bool -- becomes a generic function
-generalize f b c = case (cast b, cast c) of
-        (Just a, Just a') -> f a a'
+    (Elem a, Elem b, Elem c, Elem d) =>
+    (a -> b -> Bool) -- original simple polymorphic function
+    -> c -> d -> Bool -- becomes a generic function
+generalize f c d = case (cast c, cast d) of
+        (Just a, Just b) -> f a b
         _ -> error "Should not have been called on differing types."
 
-mkConstraint :: forall a. Elem a =>
+mkConstraint :: forall a b. (Elem a, Elem b) =>
     NodeName            -- first node
-    -> (a -> a -> Bool) -- funciton
+    -> (a -> b -> Bool) -- funciton
     -> NodeName         -- second node
     -> String           -- name of constriant
     -> Constraint       -- return
 mkConstraint n1 f n2 s = Binary s n1 n2 g f
     where
-        comp :: forall b c. (Typeable b, Typeable c) => b -> c -> Bool
+        comp :: forall c d. (Elem c, Elem d) => c -> d -> Bool
         comp = generalize f
         g :: Node -> Node -> (Node, Bool)
         g xNode@(Node x' xs) (Node y' ys)
@@ -84,8 +83,14 @@ mkConstraint n1 f n2 s = Binary s n1 n2 g f
                             $ [ x | x <- xs, any (\y -> x `comp` y) ys]
                 in ( Node x' xs', (length xs') /= length (xs) )
             | otherwise = (xNode, False)
+
+
 -- putting into type synonym for lateron
-type Over a = Elem a =>
+type Over a b = (Elem a, Elem b) =>
+                NodeName -> (a -> b -> Bool) -> NodeName
+                -> String -> Constraint
+
+type On a = (Elem a) =>
                 NodeName -> (a -> a -> Bool) -> NodeName
                 -> String -> Constraint
 
@@ -112,27 +117,30 @@ reviser = do
     if any (==True) changes
         then modify (\(n,_) -> (n,cs)) >> reviser
         else return newnet
+-}
+
+-- The State is the current net and a list of remaining
+-- to be validated constraints
+type S = (Net, [Constraint])
     
-checkSingleConstraint :: Show a => StateT (S a) IO Bool
+checkSingleConstraint :: StateT S IO Bool
 checkSingleConstraint = 
     do
         ((Net ns net_cs), cs) <- get
         case cs of
             [] -> return False
-            (c:cs') ->
-                let (Binary name s1 s2 f _) = c
-                    n1 = fromJust $ find (\n -> fst n == s1) ns
-                    n2 = fromJust $ find (\n -> fst n == s2) ns
+            ((Binary _ s1 s2 f _):cs') ->
+                let n1 = fromJust $ find (\n -> name n == s1) ns
+                    n2 = fromJust $ find (\n -> name n == s2) ns
                     (n1', changed) = f n1 n2
                     ns' = replaceNode n1 n1' ns
                     newnet = Net ns' net_cs
                 in
-                    do
-                        when changed
-                            (lift (putStrLn $ s1 ++ " vs " ++ s2 ++ ": " ++ show n1 ++ " -> " ++ show n1'))
-                        put (newnet, cs')
-                        return changed
--}
+                    when changed
+                        (lift (putStrLn $ s1 ++ " vs " ++ s2 ++ ": " ++ show n1 ++ " -> " ++ show n1'))
+                    >> put (newnet, cs')
+                    >> return changed
+
 
 -- replaces first occurrence of x in the list by y
 replaceNode :: Node -> Node -> [Node] -> [Node]

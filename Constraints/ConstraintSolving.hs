@@ -151,4 +151,15 @@ replaceNode x y (b:bs)
 flop :: Constraint -> Constraint
 flop (Binary name s1 s2 c f) = mkConstraint s2 (flip f) s1 name
 
-
+-- Actually, the Typeable Constraint istn't nesessary.
+-- every unsuccessful cast is yieled into an error.
+-- this is because the assurance of success lies in the prior check of
+-- in the node name as well as the existence and uniqueness of the nodenames.
+-- If we can assure, this (instead of relying on user input), then we can replace
+-- that by `unsafeCoerce`.
+-- Two options:
+-- 1. Use PhantomTypes to assure, the algorithms can only run on valid Nets.
+-- 2. Use type-dependent-programming/singlenton-types/type families/type associations
+--    to assure existence, uniqueness of the nodename as well as the corresponding type.
+-- Node on 2: This approach may fail or require more (interlectual) overhead when the constraint net
+-- is to be created dynaically.

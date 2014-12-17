@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, ConstraintKinds, ExistentialQuantification, DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleContexts, FlexibleInstances, ConstraintKinds, MultiParamTypeClasses, ExistentialQuantification, DeriveDataTypeable #-}
 
 import Data.Typeable
 
@@ -23,19 +23,22 @@ net = Net
         Node "zwei" (undefined::Int)
     ]
 
-class HasInt a where
-    int :: a -> Maybe Int
+class Has c a where
+    has :: c -> Maybe a
 
-instance HasInt Int where
-    int = Just
+instance Has Int Int where
+    has = Just
 
-instance (HasInt a) => HasInt [a] where
-    int = foldr (const . int) Nothing
+instance (Has c a) => Has [c] a where
+    has = foldr (const . has) Nothing
 
 
-test1 = int (3 :: Int)
-test2 = int ([] :: [Int])
-test3 = int ([1,2,3] :: [Int])
+hasInt :: Has c Int => c -> Maybe Int
+hasInt = has
+    
+test1 = hasInt (3 :: Int)
+test2 = hasInt ([] :: [Int])
+test3 = hasInt ([1,2,3] :: [Int])
 
 main = mapM_ print [test1, test2, test3]
 

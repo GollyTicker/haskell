@@ -9,7 +9,6 @@ module Types (
     )
     where
 
-
 -- Ein Knoten besteht aus seinem Namen sowie aus dessen Domainmenge
 
 data Node a = Node String (Domain a) deriving (Show, Eq)
@@ -30,7 +29,7 @@ domain (Node _ xs) = xs
 
 -- Net a ist ein Constraint Netz dessen Werte Elemente vom Typ a haben können.
 
-data Net a = Net [Node a] [Constraint a] deriving Show
+data Net a = Net [Node a] [Constraint a] deriving (Show)
 
 
 -- Ein Constraint ist eine unäre/binäry Funktion die ein Node nimmt
@@ -46,7 +45,7 @@ data Constraint a =
         ,cNode2 :: NodeName -- name des ersten Knotens
         ,apply :: (Node a -> Node a -> (Node a, Bool)) -- Funktion
         ,originalFunction :: (a -> a -> Bool) -- Kopie der originalen Funktion
-        }
+    }
     
 instance Show (Constraint a) where
     show c = "Constraint " ++ cName c

@@ -1,8 +1,8 @@
 
 module Constraints (
-        Net(..), Constraint, Node,
-        Domain, NodeName,
-        mkConstraint, var,
+        Net(..), Constraint, Node(..),
+        Domain, NodeName, nodeName,
+        mkConstraint, applyUnaryConstraint, findNode, var,
         ac3, solve
     ) where
 

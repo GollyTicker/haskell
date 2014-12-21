@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module ArcConsistency (
-        mkConstraint, ac3
+        mkConstraint, applyUnaryConstraint, findNode, ac3
     )
     where
 
@@ -10,7 +10,6 @@ import Control.Monad.State.Strict
 import Control.Monad.Identity
 import Data.List (find, nub)
 import Data.Maybe (fromJust)
-import Debug.Trace
 
 type S a = (Net a, [Constraint a])
 
@@ -21,19 +20,19 @@ ac3 net@(Net _ cs) = resultNet
         queue :: [Constraint a]
         queue = concatMap (\c -> [c, flop c]) cs    -- create initial queue of constraints.
         
-        resultNet = runIdentity $ evalStateT reviser (net, queue)       -- evalState führt die Stateful Computation aus und gibt den Rückgabewert zurück
+        resultNet = runIdentity $ evalStateT reviser (net, queue)       -- evalState fÃ¼hrt die Stateful Computation aus und gibt den RÃ¼ckgabewert zurÃ¼ck
         
         reviser :: Show a => StateT (S a) Identity (Net a)
         reviser = do
-            (net, cs) <- get
-            if null cs
-                then return net
+            (net', cs') <- get
+            if null cs'
+                then return net'
                 else reduceSingleConstraint >> reviser
 --
 
 -- reduce Single Constraints wendet den allerersten Constraint
 -- in der Liste an zu validierenden Constraints an und
--- fügt bei einer Domainreduktion die nachbarn hinzu.
+-- fÃ¼gt bei einer Domainreduktion die nachbarn hinzu.
 reduceSingleConstraint :: (Eq a, Show a) => StateT (S a) Identity Bool
 reduceSingleConstraint = 
     do
@@ -41,14 +40,14 @@ reduceSingleConstraint =
         case cs of
             [] -> return False
             (c:cr) ->
-                let (Binary name s1 s2 f _) = c
-                    n1 = fromJust $ find (\n -> nodeName n == s1) ns
-                    n2 = fromJust $ find (\n -> nodeName n == s2) ns
+                let (Binary _ s1 s2 f _) = c
+                    n1 = findNode s1 ns
+                    n2 = findNode s2 ns
                     (n1', changed) = f n1 n2
                     ns' = replaceNode n1 n1' ns
                     newnet = Net ns' ncs
                     inc = incoming (nodeName n1) ncs 
-                    relevant_neighbours = filter (\c -> cNode1 c /= nodeName n2) inc
+                    relevant_neighbours = filter (\c' -> cNode1 c' /= nodeName n2) inc
                     cs'
                         | changed = nub $ relevant_neighbours ++ cr -- nub removes duplicates
                         | otherwise = cr
@@ -67,16 +66,26 @@ mkConstraint s1 f s2 name = Binary name s1 s2 g f
                     in ( Node x' xs', xs' /= xs )
                 | otherwise = (xNode, False)
 
+applyUnaryConstraint :: Net a -> NodeName -> (a -> Bool) -> Net a
+applyUnaryConstraint (Net ns cs) s f = Net ns' cs
+    where
+        n@(Node _ dom) = findNode s ns
+        n' = Node s (filter f dom)
+        ns' = replaceNode n n' ns
+
+findNode :: NodeName -> [Node a] -> Node a
+findNode s ns = fromJust $ find (\n -> nodeName n == s) ns
+
 incoming :: NodeName -> [Constraint a] -> [Constraint a]
 incoming n = filter (\c -> cNode2 c == n)
 
 -- replaces first occurrence of x in the list by y
 replaceNode :: Node a -> Node a -> [Node a] -> [Node a]
-replaceNode x y [] = error "Not found in replace" 
+replaceNode _ _ [] = error "Not found in replace" 
 replaceNode x y (b:bs)
     | nodeName b == nodeName x = y:bs
     | otherwise = b : replaceNode x y bs
 
 -- flop takes a Constraint and builds its flipped Constraint.
 flop :: (Show a, Eq a) => Constraint a -> Constraint a
-flop (Binary name s1 s2 c f) = mkConstraint s2 (flip f) s1 name
+flop (Binary name s1 s2 _ f) = mkConstraint s2 (flip f) s1 name

@@ -9,8 +9,8 @@ net =
     Net
         [
             var "A" ls,
-            var "B" ls,
-            var "C" ls
+            var "B" [],
+            var "C" []
         ]
         []
 --

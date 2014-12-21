@@ -1,10 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Solving (
-        solve, Solution
-        
-        -- for testing
-        ,expandFirstNode
+        solve, expandFirstNode
     )
     where
 
@@ -20,10 +17,10 @@ solve net_ = case inspect net of
                 OK solution -> [solution]
                 Empty       -> []
                 Expandable  -> expandedSolutions
-    where
-        net = ac3 net_
-        nets = map ac3 $ expandFirstNode net
-        expandedSolutions = concatMap solve nets
+            where
+                net = ac3 net_
+                nets = map ac3 $ expandFirstNode net
+                expandedSolutions = concatMap solve nets
 
 data Inspection a =
     OK (Solution a)
@@ -42,7 +39,7 @@ inspect (Net ns _)
 -- returns a list of nets where the first node with more than element in domain has been reduced to a singlenton element domain
 -- returns empty if there aren't any expansions
 expandFirstNode :: forall a. Net a -> [Net a]
-expandFirstNode curr@(Net ns_ cs) =
+expandFirstNode (Net ns_ cs) =
     case ns_ of 
         [] -> []    -- falls ich keine Nodes habe, dann gibts keine relevanten Netze
         ((Node s xs@(_:_:_)):ns) ->     -- falls die Domain des ersten Elements >= 2 ist:
@@ -51,5 +48,5 @@ expandFirstNode curr@(Net ns_ cs) =
                 nets = map (\nss -> Net nss cs) newNodess       -- aus jedem NodeList ´wird ein netz erzeugt.
             in  nets
         (n:ns) ->   -- falls der aktuelle Knoten nicht mehr als zwei Elemente hat, wird rekursiv ein nachfolgender Knoten reduziert.
-            (\(Net ns' cs) -> Net (n:ns') cs) `map` expandFirstNode (Net ns cs)
+            (\(Net ns' cs') -> Net (n:ns') cs') `map` expandFirstNode (Net ns cs)
 --

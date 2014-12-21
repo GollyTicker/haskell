@@ -1,6 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables, ConstraintKinds #-}
+{-# LANGUAGE ScopedTypeVariables, ConstraintKinds, RankNTypes #-}
 module ArcConsistency (
-        mkConstraint, applyUnaryConstraint, findNode, ac3
+        mkConstraint, applyUnaryConstraint, findNode, ac3, On, Over
     )
     where
 
@@ -78,22 +78,29 @@ mkConstraint n1 f n2 s = Binary s n1 n2 g f
         g xNode@(Node x' xs) (Node y' ys)
             | x' == n1 && y' == n2 =
                 let xs' :: Domain a
-                    xs' = fCast [ x | x <- xs, any (\y -> x `comp` y) ys]
+                    xs' = (fromJust . cast) [ x | x <- xs, any (\y -> x `comp` y) ys]
                 in ( Node x' xs', (length xs') /= length (xs) )
             | otherwise = (xNode, False)
+
+-- putting into type synonym for lateron
+type Over a b = (Elem a, Elem b) =>
+                NodeName -> (a -> b -> Bool) -> NodeName
+                -> String -> Constraint
+
+type On a = (Elem a) =>
+                NodeName -> (a -> a -> Bool) -> NodeName
+                -> String -> Constraint
 
 applyUnaryConstraint :: forall a. Elem a => Net -> NodeName -> (a -> Bool) -> Net
 applyUnaryConstraint (Net ns cs) s f =
     case findNode s ns of
         n@(Node _ dom) ->
-            let n' = Node s (filter f (fCast dom :: Domain a) )
+            let n' = Node s (filter f ( (fromJust . cast) dom :: Domain a) )
                 ns' = replaceNode n n' ns
             in  Net ns' cs
 
-
 bidirectionalConstraints :: Net -> [Constraint]
 bidirectionalConstraints (Net _ cs) = concatMap (\c -> [c, flop c]) cs
-
 
 findNode :: NodeName -> [Node] -> Node
 findNode s ns = fromJust $ find (\n -> nodeName n == s) ns

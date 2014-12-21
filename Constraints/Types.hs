@@ -6,9 +6,7 @@ module Types (
         Domain, NodeName,
         Elem,
         
-        var, nodeName,
-        
-        fCast
+        var, nodeName, domainDummy
     )
     where
 
@@ -35,8 +33,9 @@ var = Node
 nodeName :: Node -> String
 nodeName (Node s _) = s
 
-fCast :: (Elem a, Elem b) => a -> b
-fCast = maybe (error "Typecast failed.") fromJust . cast
+-- create a list of Units of equal length as the domain. Used in Solving.hs
+domainDummy :: Node -> [()]
+domainDummy (Node _ xs) = map (const ()) xs
 
 -- Net a ist ein Constraint Netz dessen Werte Elemente vom Typ a haben können.
 

@@ -1,22 +1,25 @@
+{-# LANGUAGE FlexibleContexts, ConstraintKinds #-}
 
 import Constraints
 
-net :: Net Int
+nums :: [Int]
+nums = [1..4]
+
+net :: Net
 net = Net
         [
-            var "V" [1,2,3,4],
-            var "X" [1,2,3,4],
-            var "Y" [1,2,3,4],
-            var "Z" [1,2,3,4]
+            var "V" nums,
+            var "X" nums,
+            var "Y" nums,
+            var "Z" nums
         ]
         [
-            mkConstraint "X" (==) "V"               "X = V",
-            mkConstraint "X" (\x z -> x*2 == z) "Z" "X *2 = Z",
-            mkConstraint "X" (<) "Y"                "X < Y",
-            mkConstraint "Y" (==) "Z"               "Y = Z"
+            (mkConstraint :: On Int) "X" (==) "V"               "X = V",
+            (mkConstraint :: On Int) "X" (\x z -> x*2 == z) "Z" "X *2 = Z",
+            (mkConstraint :: On Int) "X" (<) "Y"                "X < Y",
+            (mkConstraint :: On Int) "Y" (==) "Z"               "Y = Z"
         ]
 
 
--- main = ac3 net
-main = print $ solve net
+main = mapM_ print (solve net)
 

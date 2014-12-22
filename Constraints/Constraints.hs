@@ -4,7 +4,11 @@ module Constraints (
         Domain, NodeName, nodeName,
         mkConstraint, applyUnaryConstraint, findNode, var,
         On, Over,
-        ac3, solve,
+        ac3,
+        solve, solveIO, solveGeneric, expandFirstNode,
+        defaultConfig,
+        Context, countAC, countInference, info, ac,
+        Solver, Config(..),
         Typeable, E(..)
     ) where
 

@@ -1,30 +1,27 @@
 {-# LANGUAGE ScopedTypeVariables, ConstraintKinds, RankNTypes #-}
 module ArcConsistency (
-        mkConstraint, applyUnaryConstraint, findNode, ac3, On, Over
+        mkConstraint, applyUnaryConstraint, findNode, ac3, On, Over,
+        Solver
     )
     where
 
 import Types
 
-import Control.Monad.State.Strict
-import Control.Monad.Identity
 import Data.List (find, nub)
 import Data.Typeable
 import Data.Maybe
+import Control.Monad.State.Strict
+import Text.Printf
 
-type S = (Net, [Constraint])
-type Reviser a = StateT S Identity a
+type St = (Net, [Constraint])
+
 
 -- Implementation von ac3. Kantenkonsistenz / Arcconsistency
-ac3 :: Net -> Net
-ac3 net = resultNet
+ac3 :: forall m c r. Context m c r => Net -> m Net
+ac3 net = countAC >> evalStateT reviser (net, queue)
     where
-        queue :: [Constraint]
-        queue = bidirectionalConstraints net    -- create initial queue of constraints.
-        
-        resultNet = runIdentity $ evalStateT reviser (net, queue)       -- evalState f�hrt die Stateful Computation aus und gibt den Rückgabewert zurück
-        
-        reviser :: Reviser Net
+        queue = bidirectionalConstraints net
+        reviser :: StateT St m Net
         reviser = do
             (net', cs') <- get
             if null cs'
@@ -35,7 +32,7 @@ ac3 net = resultNet
 -- reduce Single Constraints wendet den allerersten Constraint
 -- in der Liste an zu validierenden Constraints an und
 -- fügt bei einer Domainreduktion die nachbarn hinzu.
-reduceSingleConstraint :: StateT S Identity ()
+reduceSingleConstraint :: forall m c r. Context m c r => StateT St m ()
 reduceSingleConstraint = 
     do
         (net@(Net ns ncs), cs) <- get
@@ -50,9 +47,15 @@ reduceSingleConstraint =
                     inc = incoming (nodeName n1) $ bidirectionalConstraints net
                     relevant_neighbours = filter (\c' -> cNode1 c' /= nodeName n2) inc
                     cs'
-                        | changed = nub $ relevant_neighbours ++ cr -- nub removes duplicates
+                        | changed = nub $ relevant_neighbours ++ cr
                         | otherwise = cr
-                in
+                in do
+                    when changed
+                        (lift countInference)
+                    when changed
+                        (lift $ info $ printf "%s vs %s: +%d *%d | %s: %s -> %s"
+                                        s1 s2 (length relevant_neighbours) (length cs')
+                                        s1 (showDomain n1) (showDomain n1'))
                     put (newnet, cs')
 
 

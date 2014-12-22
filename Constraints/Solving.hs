@@ -1,7 +1,8 @@
-{-# LANGUAGE ImpredicativeTypes, ConstraintKinds, ExistentialQuantification, DeriveDataTypeable  #-}
+{-# LANGUAGE ImpredicativeTypes, FlexibleContexts, ScopedTypeVariables, ConstraintKinds, MonomorphismRestriction, ExistentialQuantification  #-}
 
 module Solving (
-        solve, expandFirstNode, E(..)
+        solve, solveIO, solveGeneric, expandFirstNode,
+        defaultConfig
     )
     where
 
@@ -10,37 +11,50 @@ import ArcConsistency
 
 import qualified Data.Map as M
 import Data.Typeable
+import Control.Monad
+import Control.Monad.Trans.RWS.Strict
+import Control.Monad.Reader as R
 
-type Solution = M.Map NodeName E
+defaultConfig :: Config
+defaultConfig =
+    Config {
+         verbose = False
+        ,countStats = True
+        ,algorithm = ac3
+    }
 
-data E = forall a. Elem a => E a deriving Typeable
-
-instance Show E where
-    show (E a) = "E " ++ show a
+solveGeneric :: forall m c r. Context m c r => m () -> Net -> c -> r
+solveGeneric t net cnf = runSolver cnf (solver net)
+    where
+        solver :: Net -> m [Solution]
+        solver net = do
+            net' <- ac net
+            case inspect net' of
+                OK solution -> info "Found solution:" >> info (show solution) >> return [solution]
+                Empty       -> info "Backtracking..." >> return []
+                Expandable expansions -> info "Expanding..." >> solveExpansions expansions
+        solveExpansions :: [Net] -> m [Solution]
+        solveExpansions = liftM concat . mapM solver
 
 -- solve takes a net and returns a list of solutions
 -- uses ac3 with Full Lookahead
-solve :: Net -> [Solution]
-solve net_ = case inspect net of
-                OK solution -> [solution]
-                Empty       -> []
-                Expandable  -> expandedSolutions
-            where
-                net = ac3 net_
-                expansions = expandFirstNode net
-                expandedSolutions = concatMap solve expansions
+solveIO :: Net -> Config -> IO [Solution]
+solveIO = solveGeneric (undefined :: R.ReaderT Config IO ())
+
+solve :: Net -> Config -> ([Solution], Int, Int, String)
+solve = solveGeneric (undefined :: RWS Config String (Int, Int) ())
 
 data Inspection =
     OK Solution
     | Empty
-    | Expandable -- add [Net]
+    | Expandable [Net]
 
 -- getSolution returns a solution to the net,
 -- if the net already has single elements as its domain
 inspect :: Net -> Inspection
-inspect (Net ns _)
+inspect net@(Net ns _)
     | any (null . domainDummy) ns                 = Empty
-    | any (not . null . drop 1 . domainDummy) ns  = Expandable
+    | any (not . null . drop 1 . domainDummy) ns  = Expandable $ expandFirstNode net
     | all (null . drop 1 . domainDummy) ns        = OK $ getSolution ns
     | otherwise = error "Net neither empty, expandable nor has a solution."
 

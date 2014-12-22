@@ -8,13 +8,18 @@ import Data.Maybe
 import Data.Ord
 import Data.Function
 import Data.Typeable
+import Text.Printf
 import qualified Data.Map as M
 
 -- main = ac3 `with` fullLookAhead net
 main :: IO ()
-main = 
-    let sols = solve netEinstein
-    in  mapM_ printSolution sols
+main = do
+    let (sols, acs, infs, _log) =
+                solve netEinstein $ defaultConfig { verbose = False }
+    putStrLn "Solutions:"
+    mapM_ printSolution sols
+    printf "%d ACs, %d inferences.\n" acs infs
+
 
 netEinstein :: Net
 netEinstein = applyUnaryConstraints $ Net nodes constraints

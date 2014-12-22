@@ -2,6 +2,7 @@
 
 import Constraints
 import qualified Data.Map as M
+import Text.Printf
 
 nums :: Domain Int
 nums = [1,2,3,4]
@@ -25,7 +26,13 @@ net = Net
        (mkConstraint :: Over Int String) "X" (\x z -> show (x+1) == z) "Z" "str(X+1) = Z"
     ]
 
-main = let solutions = solve net
-       in  mapM_ print solutions
+main = do
+        let (sols, acs, infs, log) =
+                solve net
+                    $ defaultConfig { verbose = True }
+        printf "%s" log
+        putStrLn "Solutions:"
+        mapM_ print sols
+        printf "%d ACs, %d inferences.\n" acs infs
 
 

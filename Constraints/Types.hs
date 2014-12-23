@@ -1,15 +1,6 @@
 {-# LANGUAGE ExistentialQuantification, FunctionalDependencies, MultiParamTypeClasses, RankNTypes, DeriveDataTypeable, FlexibleInstances, TypeSynonymInstances, ConstraintKinds #-}
 module Types (
-        Net(..),
-        Constraint(..),
-        Node(..),
-        Domain, NodeName,
-        Elem,
-        
-        Context, countAC, countInference, info, ac, runSolver,
-        Solver, Config(..), E(..), Solution,
-        
-        var, nodeName, domainDummy, showDomain
+        module Types
     )
     where
 

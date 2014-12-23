@@ -1,7 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, ConstraintKinds, RankNTypes #-}
 module ArcConsistency (
-        mkConstraint, applyUnaryConstraint, findNode, ac3, On, Over,
-        Solver
+        module ArcConsistency
     )
     where
 

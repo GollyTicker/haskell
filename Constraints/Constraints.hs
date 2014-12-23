@@ -17,4 +17,3 @@ import ArcConsistency
 import Solving
 
 import Data.Typeable
-

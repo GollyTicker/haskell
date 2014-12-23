@@ -1,8 +1,7 @@
 {-# LANGUAGE ImpredicativeTypes, FlexibleContexts, ScopedTypeVariables, ConstraintKinds, MonomorphismRestriction, ExistentialQuantification  #-}
 
 module Solving (
-        solve, solveIO, solveGeneric, expandFirstNode,
-        defaultConfig
+        module Solving
     )
     where
 

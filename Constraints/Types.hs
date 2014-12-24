@@ -1,4 +1,5 @@
-{-# LANGUAGE ExistentialQuantification, FunctionalDependencies, MultiParamTypeClasses, RankNTypes, DeriveDataTypeable, FlexibleInstances, TypeSynonymInstances, ConstraintKinds #-}
+{-# LANGUAGE ExistentialQuantification, FunctionalDependencies, MultiParamTypeClasses, RankNTypes, DeriveDataTypeable, ConstraintKinds #-}
+
 module Types (
         module Types
     )
@@ -6,11 +7,8 @@ module Types (
 
 import Data.Typeable
 import Data.Maybe
-import Control.Monad.Trans
-import qualified Control.Monad.Trans.Reader as R
 import qualified Data.Map as M
 import Control.Monad.Trans.RWS.Strict
-import Control.Monad.Identity
 
 type Elem a = (Show a, Typeable a)
 
@@ -87,48 +85,17 @@ class Monad m => Context m c r | m -> c r where
     ac :: Net -> m Net
     runSolver :: c -> m [Solution] -> r
 
-instance Context (R.ReaderT Config IO) Config (IO [Solution]) where
-    countAC = return () -- no counting in IO
-    countInference = return ()
-    info x = do cfg <- R.ask
-                when (verbose cfg)
-                    $ lift $ putStrLn x
-    ac net = do cfg <- R.ask
-                algorithm cfg net
-    runSolver cfg ma = R.runReaderT ma cfg
-
-instance Context Solver Config ([Solution], Int, Int, String) where
-    countAC =
-        do cfg <- ask
-           when (countStats cfg)
-               $ modify ( \(a,b) -> (succ a,b) )
-                    
-    countInference =
-        do cfg <- ask
-           when (countStats cfg)
-               $ modify ( \(a,b) -> (a,succ b) )
-
-    info x = do cfg <- ask
-                when (verbose cfg)
-                    $ tell (x ++ "\n")
-
-    ac net = do cfg <- ask
-                algorithm cfg net
-    
-    runSolver cfg solver =
-        let (r, (acs, infs), log) = runRWS solver cfg (0,0)
-        in  (r, acs, infs, log)
-
 type Solution = M.Map NodeName E
+
+-- a pure solver can read from a Config, write into a String and
+-- modify two counters and return a value a.
+type Solver = RWS Config String (Int, Int)
 
 data E = forall a. Elem a => E a deriving Typeable
 
 instance Show E where
     show (E a) = "E " ++ show a
 
--- a pure solver can read from a Config, write into a String and
--- modify two counters and return a value a.
-type Solver = RWS Config String (Int, Int)
 
 
 

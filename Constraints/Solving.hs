@@ -22,8 +22,9 @@ defaultConfig =
         ,algorithm = ac3
     }
 
+-- type m is explicitly given to be used in the inner scope.
 solveGeneric :: forall m c r. Context m c r => m () -> Net -> c -> r
-solveGeneric t net cnf = runSolver cnf (solver net)
+solveGeneric _ net cnf = runSolver cnf (solver net)
     where
         solver :: Net -> m [Solution]
         solver net = do
@@ -34,14 +35,6 @@ solveGeneric t net cnf = runSolver cnf (solver net)
                 Expandable expansions -> info "Expanding..." >> solveExpansions expansions
         solveExpansions :: [Net] -> m [Solution]
         solveExpansions = liftM concat . mapM solver
-
--- solve takes a net and returns a list of solutions
--- uses ac3 with Full Lookahead
-solveIO :: Net -> Config -> IO [Solution]
-solveIO = solveGeneric (undefined :: R.ReaderT Config IO ())
-
-solve :: Net -> Config -> ([Solution], Int, Int, String)
-solve = solveGeneric (undefined :: RWS Config String (Int, Int) ())
 
 data Inspection =
     OK Solution
@@ -75,4 +68,5 @@ expandFirstNode (Net ns_ cs) =
             in  nets
         (n:ns) ->   -- falls der aktuelle Knoten nicht mehr als zwei Elemente hat, wird rekursiv ein nachfolgender Knoten reduziert.
             (\(Net ns' cs') -> Net (n:ns') cs') `map` expandFirstNode (Net ns cs)
+
 --

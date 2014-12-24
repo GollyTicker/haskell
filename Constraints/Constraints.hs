@@ -15,5 +15,6 @@ module Constraints (
 import Types
 import ArcConsistency
 import Solving
+import Context
 
 import Data.Typeable

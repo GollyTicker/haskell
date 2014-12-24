@@ -21,6 +21,7 @@ type StrategyF a = [Path a] -> [Path a] -> [Path a]
 data Problem a =
     Problem {
          starts         :: [a]
+        ,showElem       :: a -> String  -- keep (show) in problem description
         ,checkGoal      :: a -> Bool
         ,isStateElem    :: a -> [a] -> Bool
         ,heuristic      :: Maybe (Heuristic a)

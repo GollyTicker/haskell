@@ -13,6 +13,7 @@ problem :: Problem Buckets
 problem = Problem {
         starts      = [ (0,0) ]
        ,checkGoal   = ( \x -> fst x == 2 || snd x == 2 )
+       ,showElem    = show
        ,isStateElem = elem
 
        ,actions     = [
@@ -31,6 +32,6 @@ problem = Problem {
 
 main = let sols :: [Solution Buckets]
            sols = search problem
-       in  printSolutions (take 3 sols)
+       in  printSolutions problem (take 3 sols)
            *> printf "%d solutions in total.\n" (length sols)
 

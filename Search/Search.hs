@@ -13,14 +13,14 @@ import Types
 import Utils
 import Strategies
 
-search :: Show a => Problem a -> [Solution a]
+search :: Problem a -> [Solution a]
 search p = search' p startNodes
     where startNodes = [ [mkStartNode x] | x <- starts p ]
           
 expand :: Problem a -> Node a -> [Node a]
 expand pr (Node x _ _) = map toNode . concatMap (applyOn x) . actions $ pr
 
-search' :: Show a => Problem a -> [Path a] -> [Solution a]
+search' :: Problem a -> [Path a] -> [Solution a]
 
 search' pr (p@(tip:_):ps)
     | pr `checkGoalNode` tip = p : search' pr ps

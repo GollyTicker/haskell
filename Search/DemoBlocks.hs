@@ -14,7 +14,7 @@ problem = Problem {
         starts      = [ (0,0) ]
        ,checkGoal   = ( \x -> fst x == 2 || snd x == 2 )
        ,showElem    = show
-       ,isStateElem = elem
+       ,eqElem      = (==)
 
        ,actions     = [
              mkAction "Refill" $ \(l,r) -> [ (maxL,r), (l,maxR) ]

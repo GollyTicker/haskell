@@ -35,7 +35,8 @@ search' _  _              = []
 
 mkNewPaths :: Problem a -> [Node a] -> Path a -> [Path a]
 mkNewPaths pr ns p = [ n:p | n <- ns, (validChild . getElem) n ]
-    where validChild n = not $ isStateElem pr n ns'
+    where validChild n = null $ filter (\n' -> n `eq` n') ns'
+          eq = eqElem pr
           ns' = map getElem p
 
 

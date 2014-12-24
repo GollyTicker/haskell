@@ -23,7 +23,7 @@ data Problem a =
          starts         :: [a]
         ,showElem       :: a -> String  -- keep (show) in problem description
         ,checkGoal      :: a -> Bool
-        ,isStateElem    :: a -> [a] -> Bool
+        ,eqElem         :: a -> a -> Bool
         ,heuristic      :: Maybe (Heuristic a)
         ,actions        :: [Action a]
         ,strategy       :: Strategy a

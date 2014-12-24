@@ -1,4 +1,3 @@
-{-# LANGUAGE ConstraintKinds #-}
 
 module Types (
         module Types
@@ -22,19 +21,16 @@ type StrategyF a = [Path a] -> [Path a] -> [Path a]
 data Problem a =
     Problem {
          starts         :: [a]
-        ,checkGoalNode  :: Node a -> Bool
+        ,checkGoal      :: a -> Bool
         ,isStateElem    :: a -> [a] -> Bool
-        ,expand         :: Node a -> [Node a] -- maybe not user-submitted lateron
         ,heuristic      :: Maybe (Heuristic a)
         ,actions        :: [Action a]
         ,strategy       :: Strategy a
         -- add custom strategies here?
     }
 
-data EvalPath a =
-    E (Path a -> Path a) -- should not reevaluate Justs
-
-type Elem a = (Eq a)
+checkGoalNode :: Problem a -> Node a -> Bool
+checkGoalNode pr = (pr `checkGoal`) . getElem
 
 data Node a =
     Node {
@@ -43,13 +39,27 @@ data Node a =
         ,getHvalue      :: Maybe HValue   -- Heuristics Value
     }
 
+
 mkStartNode :: a -> Node a
 mkStartNode x = Node x Start Nothing
 
-type Action a = (String, a -> [AppliedAction a])
+toNode :: AppliedAction a -> Node a
+toNode aa@(AA x _ _ _) = Node x aa Nothing
 
-data AppliedAction a = AA a String [a] | Start
-               -- result, name, args (the states it has been applied to)
+mkAction :: String -> (a -> [a]) -> Action a
+mkAction s f = Action s (\x -> zipWith (g x) (f x) [0..] )
+    where g x y n = AA y s n x
+
+data Action a = Action String (a -> [AppliedAction a])
+
+data AppliedAction a =
+    Start
+    | AA a String Int a
+   -- result, name, variationID, predecessor
+   -- (the states it has been applied to)
+
+applyOn :: a -> Action a -> [AppliedAction a]
+applyOn a (Action _ f) = f a
 
 -- a Path is a list of Nodes starting with the latest one.
 type Path a = [Node a]

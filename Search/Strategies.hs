@@ -13,7 +13,7 @@ import Data.Ord
 -- type StrategyF a = [Path a] -> [Path a] -> [Path a]
 --                    NewPaths -> OldPaths -> AllPaths
 
-insertNewPaths :: Elem a => Problem a -> StrategyF a
+insertNewPaths :: Problem a -> StrategyF a
 insertNewPaths pr = case (strategy pr, heuristic pr) of
     (Depth,_)       -> depth
     (Breadth,_)     -> breadth
@@ -41,5 +41,5 @@ a h nps ops =
         evalPath ( (Node x aa _) :ns) =
             let hvalue = h x + fromIntegral (length ns)
             in  (Node x aa (Just hvalue) ) :ns
-
+                 -- TODO: alte Justs nicht erneur berechnen
 

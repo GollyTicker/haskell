@@ -62,6 +62,9 @@ data AppliedAction a =
 applyOn :: a -> Action a -> [AppliedAction a]
 applyOn a (Action _ f) = f a
 
+getPath :: Solution a -> [a]
+getPath = map getElem
+
 -- a Path is a list of Nodes starting with the latest one.
 type Path a = [Node a]
 

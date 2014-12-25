@@ -24,32 +24,29 @@ import Types
 import Utils
 import Strategies
 
-search :: Problem a -> [Solution a]
+search :: PathT p a => Problem p a -> [Solution a]
 search p = search' p startNodes
-    where startNodes = [ [mkStartNode x] | x <- starts p ]
-          
-expand :: Problem a -> Node a -> [Node a]
-expand pr (Node x _ _) = map toNode . concatMap (applyOn x) . actions $ pr
+    where startNodes = [ mkStartPath p x | x <- starts p ]
 
-
-search' :: Problem a -> [Path a] -> [Solution a]
+search' :: PathT p a => Problem p a -> [p a] -> [Solution a]
 search' pr ps' | null ps' = []
-               | pr `checkGoalNode` tip = p : search' pr ps
+               | pr `checkGoalNode` tip = toSolution p : search' pr ps
                | otherwise = let children = pr `expand` tip
                                  new = mkNewPaths pr children p
                                  all = insertNewPaths pr new ps
                              in  search' pr all
     where
         (p:ps) = ps'
-        tip = head p
+        tip = first p
 
+expand :: Problem p a -> Node a -> [Node a]
+expand pr x = map (toNode x) . concatMap (applyOn x) . actions $ pr
 
-mkNewPaths :: Problem a -> [Node a] -> Path a -> [Path a]
-mkNewPaths pr ns p = [ n:p | n <- ns, (validChild . getElem) n ]
-    where validChild n = cd || all (\n' -> not $ n `eq` n') ns'
+mkNewPaths :: forall p a. PathT p a => Problem p a -> [Node a] -> p a -> [p a]
+mkNewPaths pr ns p = [ n `prepend` p | n <- ns, validChild n ]
+    where validChild :: Node a -> Bool
+          validChild n = cd || not (contains pr p n)
           cd = noCycleDetection pr
-          eq = eqElem pr
-          ns' = map getElem p
 
 
 

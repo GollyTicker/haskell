@@ -94,6 +94,10 @@ data AppliedAction a =
 applyOn :: Node a -> Action a -> [AppliedAction a]
 applyOn a (Action _ f) = f a
 
+-- user-friendly
+getPath :: Solution a -> [a]
+getPath = map getElem
+
 -- a Path is a list of Set of Nodes or a simple list of nodes.
 -- in the set version,the order comes from the backward references in the AAs in the nodes.
 -- the first node is saved in the set version

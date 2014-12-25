@@ -6,8 +6,8 @@ import Text.Printf
 
 type Buckets = (Int, Int)
 
-maxL = 150
-maxR = 151
+maxL = 400
+maxR = 401
 
 problem :: Problem SPath Buckets
 problem = mkProblem {

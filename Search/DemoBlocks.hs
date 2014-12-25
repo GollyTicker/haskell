@@ -6,11 +6,11 @@ import Text.Printf
 
 type Buckets = (Int, Int)
 
-maxL = 4
-maxR = 3
+maxL = 150
+maxR = 151
 
-problem :: Problem Buckets
-problem = Problem {
+problem :: Problem SPath Buckets
+problem = mkProblem {
         starts      = [ (0,0) ]
        ,checkGoal   = ( \x -> fst x == 2 || snd x == 2 )
        ,showElem    = show
@@ -27,6 +27,7 @@ problem = Problem {
         
        ,heuristic   = Nothing
        ,strategy    = Breadth
+       ,ordering    = Just compare
     }
 
 

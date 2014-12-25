@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+
 module Strategies (
         module Strategies
     )
@@ -14,7 +15,7 @@ import Data.Monoid
 -- type StrategyF a = [Path a] -> [Path a] -> [Path a]
 --                    NewPaths -> OldPaths -> AllPaths
 
-insertNewPaths :: Problem a -> StrategyF a
+insertNewPaths :: PathT p a => Problem p a -> StrategyF p a
 insertNewPaths pr = case (strategy pr, heuristic pr) of
     (Depth,_)       -> depth
     (Breadth,_)     -> breadth
@@ -23,24 +24,18 @@ insertNewPaths pr = case (strategy pr, heuristic pr) of
 
 
 -- new paths are appended at the beginning
-depth :: StrategyF a
-depth = mappend
+depth :: PathT p a => StrategyF p a
+depth = (++)
 
 -- new paths are appended at the end
-breadth :: StrategyF a
-breadth = flip mappend 
+breadth :: PathT p a => StrategyF p a
+breadth = flip (++)
 
 -- A Algorithm using a Heuristic
 -- A: f(x) = g(x) + h(x)
-a :: forall a. Problem a -> Heuristic a -> StrategyF a
+a :: forall p a. PathT p a => Problem p a -> Heuristic a -> StrategyF p a
 a pr h nps ops =
-        reorderPaths pr f
-        $ nps `mappend` ops
-    where
-        f :: [Path a] -> [Path a]
-        f = (sortBy (comparing (fromJust . getHvalue . head)) . map evalPath)
-        evalPath ( (Node x aa _) :ns) =
-            let hvalue = h x + fromIntegral (length ns)
-            in  (Node x aa (Just hvalue) ) :ns
-                 -- TODO: alte Justs nicht erneut berechnen
+    sortBy (comparing (fromJust . getHvalue . first))
+    . map (evalPathWith (\x rest -> rest + h x))
+    $ nps ++ ops
 

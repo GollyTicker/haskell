@@ -6,6 +6,8 @@
 
 import Search
 
+-- maybe better solved with Constraints?
+
 import Control.Applicative
 
 import Data.List
@@ -13,7 +15,7 @@ import Data.List
 type Grid = [Int]
 
 queensP :: Int -> Problem Grid
-queensP n = Problem {
+queensP n = mkProblem {
         starts      = [ [] ]
        ,checkGoal   = ( \ps -> length ps == n && consistent ps )
        ,showElem    = show
@@ -21,6 +23,7 @@ queensP n = Problem {
        ,heuristic   = Nothing
        ,actions     = [mkAction "Add" (act n)]
        ,strategy    = Depth
+       ,noCycleDetection = False
     }
 
 act :: Int -> Grid -> [Grid]
@@ -37,7 +40,9 @@ queens n = let p = queensP n
                xs = search p
            in  (p,xs)
 
-main = let (p,sols) = queens 8 
+main = let (p,sols) = queens 13
            xs = map ((:[]) . head) sols
-       in  mapM_ (print . head . getPath) xs *> print (length xs)
+       in do
+        mapM_ (print . head . getPath) xs -- comment out in profiling mode.
+        print (length xs)
 

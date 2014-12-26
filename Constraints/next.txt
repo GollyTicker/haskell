@@ -1,9 +1,12 @@
 
 DONE 1. intigrate ISP\a4 things using Typeable interface
 
-2a .use typeclasses to return multiple types of values
+DONE 2a.use typeclasses to return multiple types of values
 f.e. the type should say, whether IO can be used or not,
 or one or all solutions shall be returned
+
+TODO: Add efficent traceless context. This should be used after
+    the user knows, that her/his model is correct.
 
 2b. Change from StateT and IO
 to RWST (debugMode, tracing, state)

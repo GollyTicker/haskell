@@ -18,6 +18,10 @@ Profiling:
 https://downloads.haskell.org/~ghc/5.04/docs/html/users_guide/profiling.html
 $ sudo apt-get install ghc-prof
 
+-p installs profiling versions.
+http://lambdor.net/?p=258
+$ cabal install -p <pgk>
+
 -}
 
 import Types

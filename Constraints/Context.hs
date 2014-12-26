@@ -22,6 +22,10 @@ solveIO = solveGeneric (undefined :: R.ReaderT Config IO ())
 solve :: Net -> Config -> ([Solution], Int, Int, String)
 solve = solveGeneric (undefined :: RWS Config String (Int, Int) ())
 
+
+solveFast :: Net -> Config -> [Solution]
+solveFast = solveGeneric (undefined :: R.ReaderT Config Identity ())
+
 instance Context (R.ReaderT Config IO) Config (IO [Solution]) where
     countAC = return () -- no counting in IO
     countInference = return ()
@@ -33,6 +37,7 @@ instance Context (R.ReaderT Config IO) Config (IO [Solution]) where
     runSolver cfg ma = R.runReaderT ma cfg
 
 
+-- type Solver = RWS Config String (Int, Int)
 instance Context Solver Config ([Solution], Int, Int, String) where
     countAC =
         do cfg <- ask
@@ -54,5 +59,16 @@ instance Context Solver Config ([Solution], Int, Int, String) where
     runSolver cfg solver =
         let (r, (acs, infs), log) = runRWS solver cfg (0,0)
         in  (r, acs, infs, log)
+
+
+instance Context (R.ReaderT Config Identity) Config [Solution] where
+    countAC = return () -- no counting here
+    countInference = return ()
+    info x = return ()  -- no info here
+
+    ac net = do cfg <- R.ask
+                algorithm cfg net
+    
+    runSolver cfg solver = runIdentity $ R.runReaderT solver cfg
 
 

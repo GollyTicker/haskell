@@ -5,7 +5,7 @@ module Constraints (
         mkConstraint, applyUnaryConstraint, findNode, var,
         On, Over,
         ac3,
-        solve, solveIO, solveGeneric, expandFirstNode,
+        solve, solveIO, solveFast, solveGeneric, expandFirstNode,
         defaultConfig,
         Context, countAC, countInference, info, ac,
         Solver, Config(..),

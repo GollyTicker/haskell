@@ -11,6 +11,8 @@ module Search (
 -- TODO: Profiling first!
 -- TODO: Tests? xD
 
+-- Proper Project structure: https://en.wikibooks.org/wiki/Haskell/Packaging
+
 {-
 
 Profiling:

@@ -3,14 +3,16 @@ import Solving
 import Constraints
 import Control.Monad
 
-ls = [0..2]
+ls = [0..2] :: Domain Int
+
+ls_ = [1] :: Domain Int
 
 net = 
     Net
         [
             var "A" ls,
-            var "B" [],
-            var "C" []
+            var "B" ls_,
+            var "C" ls
         ]
         []
 --

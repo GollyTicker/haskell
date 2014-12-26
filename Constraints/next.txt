@@ -1,0 +1,36 @@
+
+DONE 1. intigrate ISP\a4 things using Typeable interface
+
+2a .use typeclasses to return multiple types of values
+f.e. the type should say, whether IO can be used or not,
+or one or all solutions shall be returned
+
+2b. Change from StateT and IO
+to RWST (debugMode, tracing, state)
+    and ErrorT (early exit in DebugMode or general error)
+
+
+solve ::
+    RWST Config String (S a) (
+        ErrorT String (
+            Identity (
+                Solution a
+            )
+        )
+    )
+
+3. 
+Actually, the Typeable Constraint istn't nesessary.
+every unsuccessful cast is yieled into an error.
+this is because the assurance of success lies in the prior check of
+in the node name as well as the existence and uniqueness of the nodenames.
+If we can assure, this (instead of relying on user input), then we can replace
+that by `unsafeCoerce`.
+Two options:
+1. Use PhantomTypes to assure, the algorithms can only run on valid Nets.
+2. Use type-dependent-programming/singlenton-types/type families/type associations
+   to assure existence, uniqueness of the nodename as well as the corresponding type.
+Node on 2: This approach may fail or require more (interlectual) overhead when the constraint net
+is to be created dynamically.
+
+

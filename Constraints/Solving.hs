@@ -13,6 +13,9 @@ import Data.Typeable
 import Control.Monad
 import Control.Monad.Trans.RWS.Strict
 import Control.Monad.Reader as R
+import Data.List
+import Data.Ord
+import Debug.Trace
 
 defaultConfig :: Config
 defaultConfig =
@@ -55,18 +58,19 @@ getSolution = foldr f M.empty
     where f :: Node -> Solution -> Solution
           f (Node s [x]) = M.insert s (E x)
 
+expandFirstNode :: Net -> [Net]
+expandFirstNode (Net ns cs) = expandFirstNode' (Net ns' cs)
+    where ns' = sortBy (comparing (length . domainDummy)) ns
+
 -- returns a list of nets where the first node with more than element in domain has been reduced to a singlenton element domain
 -- returns empty if there aren't any expansions
-expandFirstNode :: Net -> [Net]
-expandFirstNode (Net ns_ cs) =
-    case ns_ of 
-        [] -> []    -- falls ich keine Nodes habe, dann gibts keine relevanten Netze
-        ((Node s xs@(_:_:_)):ns) ->     -- falls die Domain des ersten Elements >= 2 ist:
+expandFirstNode' :: Net -> [Net]
+expandFirstNode' (Net ns_ cs) =
+    let (firsts, ends) = span (null . drop 1 . domainDummy) ns_ -- firsts is a list of singleton-domain nodes
+    in  case ends of
+         (Node s xs@(_:_:_)):ns -> 
             let newNodess :: [ [Node] ]
                 newNodess = map (\x -> (Node s [x]):ns ) xs   -- erzeugen der Liste an [Node] wobei jede NodeList ein anderes Element x ausgewählt hat
-                nets = map (\nss -> Net nss cs) newNodess       -- aus jedem NodeList ´wird ein netz erzeugt.
+                nets = map (\nss -> Net (firsts ++ nss) cs) newNodess       -- aus jedem NodeList ´wird ein netz erzeugt.
             in  nets
-        (n:ns) ->   -- falls der aktuelle Knoten nicht mehr als zwei Elemente hat, wird rekursiv ein nachfolgender Knoten reduziert.
-            (\(Net ns' cs') -> Net (n:ns') cs') `map` expandFirstNode (Net ns cs)
-
---
+         ls -> []

@@ -10,6 +10,7 @@ module Search (
 -- TODO: Use Data.Sequence instead of Lists?
 -- TODO: Profiling first!
 -- TODO: Tests? xD
+-- TODO: mkAction mit sprechenden Strings statt Zahlen
 
 -- Proper Project structure: https://en.wikibooks.org/wiki/Haskell/Packaging
 

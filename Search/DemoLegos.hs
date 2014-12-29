@@ -6,19 +6,83 @@ import Data.List
 import Data.Ord
 import Data.Maybe
 import Text.Printf
+import Debug.Trace
 
+import Control.Monad.Identity
+import Control.Applicative
 
+{-
+This module uses the Applicative Instance of (->) r
+Dont freak out.
+
+Here is what it does.
+
+Instead of writing
+
+(a', b', c', d') = (fa x, fb x, fc x, fd x)
+
+to get the different new values for a to d and
+where fa to fd are similar functions,
+one can write
+
+(a', b', c', d') = (,,,) <$> fa <*> fb <*> fc <*> fd $ x
+
+The applicative part of the expression (everything except $ x)
+means as much as:
+"Apply the argument on each of the functions and collect the results
+using the provided function at the left."
+
+# See: http://learnyouahaskell.com/functors-applicative-functors-and-monoids#applicative-functors
+-}
+
+linebreak :: IO ()
+linebreak = putStrLn "----------------"
+
+main:: IO ()
 main = do
+    linebreak
+    
+    putStrLn "Initial world:"
+    showTop initialWorld
+    linebreak
+    
     putStrLn "Are there errors in the initial world?"
     print $ validWorld initialWorld
-    putStrLn "Initial world:"
-    putStrLn $ topview initialWorld
+    linebreak
+    
+    let xs = pick initialWorld
+    printf "Showing first of %d possibilities to pick up\n" (length xs)
+    let x = head xs
+    showTop x
+    linebreak
+    
+    let ys = put x -- TODO...
+    printf "Showing first of %d possibilities to put down\n" (length ys)
+    showTop (head ys)
+    linebreak
+
+showTop :: World -> IO ()
+showTop = putStrLn . topview
 
 type P = SPath
 type Size = Int
 type Pos = (Int,Int,Int)
 type Legos = S.Set (Posed Lego)
-
+type M = Identity
+type Box = (Pos, Pos) -- a box anywhere
+newtype Vector = Vector Pos -- a Vector/Box from the origin
+-- a small typeclass to refactor a few functions with similar usages
+class Vectorspace a where
+    move        :: Vector -> a -> a
+    moveUp      :: a -> a
+    moveUp = move (Vector (0,0,1))
+    moveDown    :: a -> a
+    moveDown = move (Vector (0,0,-1))
+    -- should satisfy 
+    --     move (Vector (0,0,0)) = id
+instance Vectorspace Pos where move (Vector (dx,dy,dz)) (x,y,z) = (x + dx, y + dy, z + dz)
+instance Vectorspace Box where move v (p,p') = (move v p, move v p')
+    
 data World = 
     World {
          holding    :: Maybe Lego -- lego currently in hand
@@ -48,24 +112,25 @@ data Posed a = PS { getLego :: a, getOrigin :: Pos, getEdge :: Pos} deriving Sho
 -- in the higher and middle part to the upper left corner for meaningful
 -- interpretations for findMaximum/minimum and lookupGT/LT in the Set
 
-getPBox :: Posed Lego -> PBox
-getPBox (PS _ a b) = (a,b)
+getBox :: Posed Lego -> Box
+getBox (PS _ a b) = (a,b)
 
 instance Ord (Posed a) where compare = comparing getOrigin
 -- no need to compare lego, because that would mean that the two Lego are overlapping
 
 instance Eq (Posed a) where x == y = (EQ==)$ comparing getOrigin x y
 
-legoProblem :: Problem P World
+legoProblem :: Problem P M World
 legoProblem =
     mkProblem {
          starts      = [ initialWorld ]
-        ,checkGoal   = allOnFloor
+        ,checkGoal   = Identity . allOnFloor
         ,showElem    = topview -- show
         ,eqElem      = (==)
 
         ,actions     = [
-              mkAction "DoStuff" doStuff
+               mkAction "Pick" (Identity . pick)
+              ,mkAction "Put"  (Identity . put)
          ]
         
         ,heuristic   = Nothing
@@ -79,69 +144,62 @@ allOnFloor = all onFloor . S.toList . legos
 onFloor :: Posed Lego -> Bool
 onFloor = uncurry3 (\x y z -> z == 0) . getOrigin
 
-doStuff :: World -> [World]
-doStuff (World Nothing s ls) = [ World (Just l) s ls' | (l,ls') <- pickable ls ]
-doStuff (World (Just l) s ls) = [ World Nothing s ls' | ls' <- putable l ls ]
+-- Ich wünschte man könnte pick und put als reverse Methoden
+-- voneinander definieren...
+
+pick :: World -> [World]
+pick (World Nothing size s) = [ validate $ World (Just l) size s' | (l,s') <- pickable s ]
+pick _ = []
+
+put :: World -> [World]
+put (World (Just l) size s) = [ validate $ World Nothing size s' | s' <- putable size l s ]
+put _ = []
+
+-- for debug
+validate :: World -> World
+validate w | validWorld w == Nothing     = w
+           | otherwise = error "invalidWorld!"
 
 -- find all places one can put this lego at
-putable :: Lego -> Legos -> [Legos]
-putable l ls = [ S.insert l' ls | l' <- newPositions ]
+putable :: Size -> Lego -> Legos -> [Legos]
+putable size l s = [ S.insert l' s | l' <- newPositions ]
     where
-        surfaces     :: [Pos]
-        newPositions :: [Posed Lego]
-        surfaces = undefined
-        newPositions =
-            filter (isFree ls . getPBox)
-            . map (uncurry3 (mkPositionedLego l))
-            $ surfaces
---        surfaces = undefined
-  --      validOrigins = map undefined -- check for collisions, surfaces
+        newPositions = filter (isLoose s) $ mkLego <$> range <*> range <*> range  
+        range = [0..(size-1)]
+        mkLego :: Int -> Int -> Int -> Posed Lego
+        mkLego = mkPositionedLego l
 
 uncurry3 :: (a -> b -> c -> d) -> (a,b,c) -> d
 uncurry3 f = \(a,b,c) -> f a b c
 
+curry3 :: ((a,b,c) -> d) -> a -> b -> c -> d
+curry3 f = \a b c -> f(a,b,c)
+
+-- applicative chaining of logical operations is quite useful!
+isLoose :: Legos -> Posed Lego -> Bool
+isLoose s = (||) <$> looseOnFloor <*> looseOnLego
+    where
+        looseOnLego = (&&) <$> not . onFloor <*> (xor <$> topFree s <*> botFree s)
+        looseOnFloor = (&&) <$> onFloor <*> topFree s
+
+xor a = (||) <$> ((a &&) . not) <*> (not a &&)
+
 -- find all legos one can pick
 pickable :: Legos -> [(Lego, Legos)]
-pickable set = [ (lego,set') | p@(PS lego _ _) <- picks, let set' = S.delete p set ]
+pickable s = [ (lego,s') | p@(PS lego _ _) <- picks, let s' = S.delete p s ]
     where
-        picks = S.toList $ S.filter nothingAbove set
-        nothingAbove posl =
-            isFree set
-            $ moveUp
-            $ boxTop
-            $ getPBox posl
-
-
-type PBox = (Pos, Pos) -- a box anywhere
-
-newtype Vector = Vector Pos -- a Vector/Box from the origin
-
--- a small typeclass to refactor a few functions with similar usages
-class Vectorspace a where
-    move        :: Vector -> a -> a
-    moveUp      :: a -> a
-    moveUp = move (Vector (0,0,1))
-    moveDown    :: a -> a
-    moveDown = move (Vector (0,0,-1))
-    -- should satisfy 
-    --     move (Vector (0,0,0)) = id
-
-instance Vectorspace Pos where
-    move (Vector (dx,dy,dz)) (x,y,z) = (x + dx, y + dy, z + dz)
-
-instance Vectorspace PBox where
-    move v (p,p') = (move v p, move v p')
+        picks = S.toList . S.filter (isLoose s) $ s
 
 -- is the box free in the set of legos?
-isFree :: Legos -> PBox -> Bool
-isFree set b = S.null $ intersectsPBox b set
+isFree :: Legos -> Box -> Bool
+isFree set b = S.null $ intersectsBox b set
 
 -- which legos intersect with with this box?
-intersectsPBox :: PBox -> Legos -> Legos
-intersectsPBox b = S.filter (intersects b . getPBox)
+intersectsBox :: Box -> Legos -> Legos
+intersectsBox b = S.filter (intersects b . getBox)
 
 -- are two boxes intersecting?
-intersects :: PBox -> PBox -> Bool
+intersects :: Box -> Box -> Bool
 intersects a b =
     let ( (ax,ay,az), (ax',ay',az') ) = a
         ( (bx,by,bz), (bx',by',bz') ) = b
@@ -154,11 +212,11 @@ rint :: Int -> Int -> Int -> Int -> Bool
 rint x x' y y' = x <= y' && y <= x'
 
 -- what is the top plane of the box?
-boxTop :: PBox -> PBox
+boxTop :: Box -> Box
 boxTop ((x,y,_),(x',y',z')) = ((x,y,z'), (x',y',z'))
 
 -- what is the bottom plane of the box?
-boxBot :: PBox -> PBox
+boxBot :: Box -> Box
 boxBot ((x,y,z),(x',y',_)) = ((x,y,z), (x',y',z))
 
 
@@ -173,21 +231,22 @@ validWorld w | S.null flys && null intersects = Nothing
         flys = flyings ls
 
 -- which legos are flying?
-
+-- those, who have nothing underneath or above them
 flyings :: Legos -> Legos
-flyings ls = S.filter flying ls
-    where
-        flying lego = let pb = getPBox lego
-                          floor = boxBot pb
-                          underneath = moveDown floor
-                          legosUnderneath = intersectsPBox underneath ls
-                      in  not (onFloor lego) && S.null legosUnderneath
+flyings s = S.filter flying s
+    where flying =
+            (&&) <$> not . onFloor <*> ( (&&) <$> topFree s <*> botFree s )
+
+topFree, botFree, boxFree :: Legos -> Posed Lego -> Bool
+topFree set = isFree set . moveUp   . boxTop . getBox
+botFree set = isFree set . moveDown . boxBot . getBox
+boxFree set = isFree set . getBox -- is the box of this lego free in the given set?
 
 -- which legos are intersecting?
 intersections :: Legos -> [(Posed Lego,Posed Lego)]
 intersections = catMaybes . forPairs f . (S.toList)
     where
-        f a b | intersects (getPBox a) (getPBox b) = Just (a,b)
+        f a b | intersects (getBox a) (getBox b) = Just (a,b)
               | otherwise = Nothing
 
 forPairs :: Eq a => (a -> a -> c) -> [a] -> [c]
@@ -199,10 +258,10 @@ initialWorld =
     in  World Nothing size
         $ S.fromList
         $ zipWith4 mkPositionedLego
-            [ L2x2x2 ,L2x2x2 ,L2x6x2 ,L6x2x2 ,L2x4x2 ,L4x2x2]
-            [ 0      ,2      ,0      ,1      ,6      ,2     ]
-            [ 0      ,0      ,0      ,4      ,3      ,5     ]
-            [ 0      ,0      ,2      ,4      ,0      ,6     ]
+            [ L2x2x2 ,L2x2x2 ,L2x6x2 ,L6x2x2 ,L2x2x2 ,L2x4x2 ,L4x2x2]
+            [ 0      ,2      ,0      ,1      ,3      ,6      ,2     ]
+            [ 0      ,0      ,0      ,4      ,3      ,3      ,5     ]
+            [ 0      ,0      ,2      ,4      ,2      ,0      ,6     ]
 
 -- How the world looks like
 -- Topview. The number says the height
@@ -221,21 +280,21 @@ initialWorld =
 -}
 
 topview :: World -> String
-topview (World h s ls) = "Holding " ++ show h ++ "\n" ++ topview' s ls
+topview (World h size s) = "Holding " ++ show h ++ "\n" ++ topview' size s
 
 topview' :: Int -> Legos -> String
-topview' s ls = toString heights
+topview' size s = toString heights
     where
-        range = [0..(s-1)]
+        range = [0..(size-1)]
         heights :: [[Int]]
         heights = [ [ heightAt x y | x <- range] | y <- range]
         heightAt :: Int -> Int -> Int
         heightAt x y = 
-            let rod = ((x,y,0),(x,y,s))
-                onRod = intersectsPBox rod ls
+            let rod = ((x,y,0),(x,y,size))
+                onRod = intersectsBox rod s
             in  if S.null onRod
                     then 0
-                    else S.findMax . S.map (getZ . snd . getPBox) $ onRod
+                    else S.findMax . S.map (getZ . snd . getBox) $ onRod
 
 toString :: Show a => [[a]] -> String
 toString = intercalate "\n" . map (intercalate "". map show)

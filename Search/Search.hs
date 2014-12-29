@@ -11,7 +11,10 @@ module Search (
 -- TODO: Profiling first!
 -- TODO: Tests? xD
 -- TODO: mkAction mit sprechenden Strings statt Zahlen
+
 -- TODO: Search als Transformer um effekte in expand zu intigrieren
+
+-- TODO: Transformer schöner modellieren und intigrieren?
 
 -- Proper Project structure: https://en.wikibooks.org/wiki/Haskell/Packaging
 
@@ -33,19 +36,39 @@ import Utils
 import Strategies
 
 import Control.Monad
+import Pipes
 
-search :: (PathT p a, Monad m) => Problem p m a -> m [Solution a]
+-- SearchT
+-- p implements the search tree data structure (can be cahnged for efficiency etc...)
+-- m is the inner monad which is used in node expansion and goal checking.
+-- a is the type of the search space. eg. (Int,Int) in bucket example
+-- r is the return type of the Producer on it's termination.
+
+-- r might be used lateron for stats etc. like in Context.hs in /Constraints
+{-
+newtype SearchT p m a r = SearchT {
+        runSearchT ::
+            (PathT p a, Monad m) =>
+            Problem p m a
+            -> Producer Solution a m r
+    }
+-}
+-- SearchT could be a monad. That could mean
+-- doing a search in the expansion of an outer search. (which isnt far fetched)
+
+
+search :: (PathT p a, Monad m) => Problem p m a -> Producer (Solution a) m ()
 search p = search' p startNodes
     where startNodes = [ mkStartPath p x | x <- starts p ]
 
-search' :: (PathT p a, Monad m) => Problem p m a -> [p a] -> m [Solution a]
+search' :: (PathT p a, Monad m) => Problem p m a -> [p a] -> Producer (Solution a) m ()
 search' pr ps' = do
-    status <- stat pr ps'
+    status <- lift $ stat pr ps'
     case status of
-        Sackgasse          -> return []
-        Goal      p ps     -> (toSolution p:) `liftM` search' pr ps
+        Sackgasse          -> return ()
+        Goal      p ps     -> yield (toSolution p) >> search' pr ps
         Continue  tip p ps -> do
-                                children <- pr `expand` tip
+                                children <- lift $ pr `expand` tip
                                 let new = mkNewPaths pr children p
                                     all = insertNewPaths pr new ps
                                 search' pr all

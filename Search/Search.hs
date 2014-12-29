@@ -11,6 +11,7 @@ module Search (
 -- TODO: Profiling first!
 -- TODO: Tests? xD
 -- TODO: mkAction mit sprechenden Strings statt Zahlen
+-- TODO: Search als Transformer um effekte in expand zu intigrieren
 
 -- Proper Project structure: https://en.wikibooks.org/wiki/Haskell/Packaging
 
@@ -31,25 +32,43 @@ import Types
 import Utils
 import Strategies
 
-search :: PathT p a => Problem p a -> [Solution a]
+import Control.Monad
+
+search :: (PathT p a, Monad m) => Problem p m a -> m [Solution a]
 search p = search' p startNodes
     where startNodes = [ mkStartPath p x | x <- starts p ]
 
-search' :: PathT p a => Problem p a -> [p a] -> [Solution a]
-search' pr ps' | null ps' = []
-               | pr `checkGoalNode` tip = toSolution p : search' pr ps
-               | otherwise = let children = pr `expand` tip
-                                 new = mkNewPaths pr children p
-                                 all = insertNewPaths pr new ps
-                             in  search' pr all
-    where
-        (p:ps) = ps'
-        tip = first p
+search' :: (PathT p a, Monad m) => Problem p m a -> [p a] -> m [Solution a]
+search' pr ps' = do
+    status <- stat pr ps'
+    case status of
+        Sackgasse          -> return []
+        Goal      p ps     -> (toSolution p:) `liftM` search' pr ps
+        Continue  tip p ps -> do
+                                children <- pr `expand` tip
+                                let new = mkNewPaths pr children p
+                                    all = insertNewPaths pr new ps
+                                search' pr all
 
-expand :: Problem p a -> Node a -> [Node a]
-expand pr x = map (toNode x) . concatMap (applyOn x) . actions $ pr
+stat :: (PathT p a, Monad m) => Problem p m a -> [p a] -> m (Status p a)
+stat pr ps'@(p:ps) =
+    let tip = first p
+    in if null ps' then return Sackgasse
+       else do
+              isGoal <- pr `checkGoalNode` tip
+              if isGoal
+                then return $ Goal p ps
+                else return $ Continue tip p ps
 
-mkNewPaths :: forall p a. PathT p a => Problem p a -> [Node a] -> p a -> [p a]
+data Status p a =
+    Sackgasse
+    | Goal (p a) [p a]
+    | Continue (Node a) (p a) [p a]
+
+expand :: Monad m => Problem p m a -> Node a -> m [Node a]
+expand pr x = liftM (map (toNode x) . concat) . mapM (applyOn x) . actions $ pr
+
+mkNewPaths :: forall p m a. PathT p a => Problem p m a -> [Node a] -> p a -> [p a]
 mkNewPaths pr ns p = [ n `prepend` p | n <- ns, validChild n ]
     where validChild :: Node a -> Bool
           validChild n = cd || not (contains pr p n)

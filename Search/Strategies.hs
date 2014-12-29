@@ -15,7 +15,7 @@ import Data.Monoid
 -- type StrategyF a = [Path a] -> [Path a] -> [Path a]
 --                    NewPaths -> OldPaths -> AllPaths
 
-insertNewPaths :: PathT p a => Problem p a -> StrategyF p a
+insertNewPaths :: PathT p a => Problem p m a -> StrategyF p a
 insertNewPaths pr = case (strategy pr, heuristic pr) of
     (Depth,_)       -> depth
     (Breadth,_)     -> breadth
@@ -33,7 +33,7 @@ breadth = flip (++)
 
 -- A Algorithm using a Heuristic
 -- A: f(x) = g(x) + h(x)
-a :: forall p a. PathT p a => Problem p a -> Heuristic a -> StrategyF p a
+a :: forall p m a. PathT p a => Problem p m a -> Heuristic a -> StrategyF p a
 a pr h nps ops =
     sortBy (comparing (fromJust . getHvalue . first))
     . map (evalPathWith (\x rest -> rest + h x))

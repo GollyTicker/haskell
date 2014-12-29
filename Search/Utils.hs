@@ -11,12 +11,12 @@ import Control.Applicative
 import Control.Monad
 import Text.Printf
 
-printSolutions :: Problem p a -> [Solution a] -> IO ()
+printSolutions :: Problem p m a -> [Solution a] -> IO ()
 printSolutions pr xs =
     printf "Showing %d solutions:\n" (length xs)
     *> (mapM_ (*> putStrLn "") . map (printSolution pr) ) xs
 
-printSolution :: Problem p a -> Solution a -> IO ()
+printSolution :: Problem p m a -> Solution a -> IO ()
 printSolution pr = putStrLn . toString . zipWith f [0..] . reverse
     where
         f i (Node x aa _ _) = ( (show i ++ ": " ++ showAA aa), " -> ", pr `showElem` x )

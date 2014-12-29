@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables #-}
 module Types (
         module Types
     )
@@ -7,6 +7,7 @@ module Types (
 import qualified Data.Set as S
 import Data.Monoid
 import Data.Maybe
+import Control.Monad
 
 (.:) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
 f .: g = \x y -> f $ g x y
@@ -25,14 +26,14 @@ type StrategyF p a = [p a] -> [p a] -> [p a]
 -- consists of elemets of type a.
 -- In example, the water bucket problem might use (Int, Int)
 -- where the two numbers represent the liters in each bucket.
-data Problem p a =
+data Problem p m a =
     Problem {
          starts         :: [a]
         ,showElem       :: a -> String  -- keep (show) in problem description
-        ,checkGoal      :: a -> Bool
+        ,checkGoal      :: a -> m Bool
         ,eqElem         :: a -> a -> Bool
         ,heuristic      :: Maybe (Heuristic a)
-        ,actions        :: [Action a]
+        ,actions        :: [Action m a]
         ,strategy       :: Strategy a
         ,ordering       :: Maybe (a -> a -> Ordering) -- if given, allows usage of Sets to optimize cycle detection
         ,noCycleDetection :: Bool
@@ -40,13 +41,13 @@ data Problem p a =
             -- reduces time comsumption
         -- add custom strategies here?
         
-        ,_hidden         :: Maybe (p a) -- needed to make sure,
+        ,_hidden         :: Maybe (m a, p a) -- needed to make sure,
                                         -- GHC interprets
                                         -- phantom type p :: * -> *
     }
 
 -- default Problem for easier use with record Syntax
-mkProblem :: Problem p a
+mkProblem :: Problem p m a
 mkProblem = Problem {
          starts = error "mkProblem{starts = ... Please specify ... } "
         ,showElem = error "mkProblem{showElem = ... Please specify ... } "
@@ -60,7 +61,7 @@ mkProblem = Problem {
         ,_hidden = Nothing
     }
 
-checkGoalNode :: Problem p a -> Node a -> Bool
+checkGoalNode :: Problem p m a -> Node a -> m Bool
 checkGoalNode pr = (pr `checkGoal`) . getElem
 
 data Node a =
@@ -79,11 +80,17 @@ instance Eq (Node a) where (==) = (EQ==) .: compare
 toNode :: Node a -> AppliedAction a -> Node a
 toNode pred aa@(AA x _ _ _) = Node x aa Nothing (ord pred)
 
-mkAction :: String -> (a -> [a]) -> Action a
-mkAction s f = Action s (\node@(Node x _ _ _) -> zipWith (g node) (f x) [0..] )
-    where g node y n = AA y s n node
+mkAction :: forall m a. Monad m => String -> (a -> m [a]) -> Action m a
+mkAction s f = Action s h --
+    where
+        h :: Node a -> m [AppliedAction a]
+        h node@(Node x _ _ _) =
+                    liftM
+                        (zipWith (g node) [0..])
+                        (f x)
+        g node n y = AA y s n node
 
-data Action a = Action String (Node a -> [AppliedAction a])
+data Action m a = Action String (Node a -> m [AppliedAction a])
 
 data AppliedAction a =
     Start
@@ -91,7 +98,7 @@ data AppliedAction a =
    -- result, name, variationID, predecessor
    -- (the states it has been applied to)
 
-applyOn :: Node a -> Action a -> [AppliedAction a]
+applyOn :: Node a -> Action m a -> m [AppliedAction a]
 applyOn a (Action _ f) = f a
 
 -- user-friendly
@@ -108,11 +115,11 @@ newtype LPath a = LPath { getLPath :: [Node a] }
 class PathT p a where
     first        :: p a -> Node a
     prepend      :: Node a -> p a -> p a
-    mkStartPath  :: Problem p a -> a -> p a
+    mkStartPath  :: Problem p m a -> a -> p a
     toSolution   :: p a -> Solution a
     evalPathWith :: PathT p a => (a -> HValue -> HValue) -> p a -> p a
     -- TODO: evalPathWith - alte Justs nicht erneut berechnen
-    contains     :: Problem p a -> p a -> Node a -> Bool
+    contains     :: Problem p m a -> p a -> Node a -> Bool
 
 instance PathT SPath a where
     first (SPath x _) = x

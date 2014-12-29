@@ -173,6 +173,7 @@ validWorld w | S.null flys && null intersects = Nothing
         flys = flyings ls
 
 -- which legos are flying?
+
 flyings :: Legos -> Legos
 flyings ls = S.filter flying ls
     where

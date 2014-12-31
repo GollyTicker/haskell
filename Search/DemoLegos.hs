@@ -8,7 +8,9 @@ import Data.Maybe
 import Text.Printf
 import Debug.Trace
 import Test.QuickCheck
-import System.Random
+import qualified System.Random as SR
+import Pipes
+import qualified Pipes.Prelude as P
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
@@ -56,18 +58,29 @@ main = do
     linebreak
     
     let xs = pick initialWorld
-    printf "Showing first of %d possibilities to pick up\n" (length xs)
-    let x = head xs
+    printf "Showing second of %d possibilities to pick up\n" (length xs)
+    let x = xs !! 1
     showTop x
     linebreak
     
-    let ys = put x
-    printf "Showing first of %d possibilities to put down\n" (length ys)
-    showTop (head ys)
+    let ys = rotate x
+    printf "Showing first of %d possibilities to rotate\n" (length ys)
+    let y = head ys
+    showTop y
     linebreak
     
-    putStrLn "Running Tests"
-    void runTests
+    let zs = put y
+    printf "Showing first of %d possibilities to put down\n" (length zs)
+    showTop (head zs)
+    linebreak
+    
+    let p = search legoProblem
+    runEffect $ p >-> P.map getPath >->P.print
+    
+    
+    --putStrLn "Running Tests"
+    --void runTests
+    return ()
 
 showTop :: World -> IO ()
 showTop = putStrLn . topview
@@ -76,9 +89,9 @@ type P = SPath
 type Size = Int
 type Pos = (Int,Int,Int)
 type Legos = S.Set (Posed Lego)
-type M = Identity
+type M = IO
 type Box = (Pos, Pos) -- a box anywhere
-newtype Vector = Vector Pos -- a Vector/Box from the origin
+newtype Vector = Vector Pos deriving (Eq, Ord, Show, Read) -- a Vector/Box from the origin
 -- a small typeclass to refactor a few functions with similar usages
 class Vectorspace a where
     move        :: Vector -> a -> a
@@ -97,7 +110,10 @@ data World =
         ,worldSize  :: Size     -- the world is a cube with Size length,widht and height
         ,legos      :: S.Set (Posed Lego)
     } deriving (Ord, Eq)
-instance Show World where show = topview
+
+instance Show World where
+    show w = topview w ++ "\n"
+             ++ printf "World (%s) %d (%s)" (show $ holding w) (worldSize w) (show $ legos w)
 
 data Lego = 
     L6x2x2   | L2x6x2 
@@ -105,24 +121,34 @@ data Lego =
     | L2x2x2
     deriving (Show, Eq, Ord, Read, Enum, Bounded)
 
-instance Random Lego where
+instance SR.Random Lego where
     randomR (a,b) g =
         let domain = [a .. b] :: [Lego]
             len = length domain
-            (i,g') = next g
+            (i,g') = SR.next g
             i' = i `mod` len
         in  (domain !! i', g')
-    random = randomR (minBound,maxBound)
+    random = SR.randomR (minBound,maxBound)
 
 instance Arbitrary Lego where
     arbitrary = choose (minBound, maxBound)
 
 legoBox :: Lego -> Vector
-legoBox L2x6x2 = minusOne $ Vector (2,6,2) -- converting to zero based
-legoBox L6x2x2 = minusOne $ Vector (6,2,2)
-legoBox L2x2x2 = minusOne $ Vector (2,2,2)
-legoBox L4x2x2 = minusOne $ Vector (4,2,2)
-legoBox L2x4x2 = minusOne $ Vector (2,4,2)
+legoBox l = let ('L':x':'x':y':'x':z':[]) = show l
+                x = read (x':[]) :: Int
+                y = read (y':[]) :: Int
+                z = read (z':[]) :: Int
+            in  minusOne $ Vector (x,y,z) -- converting to zero based
+
+toVector :: Lego -> Vector
+toVector = legoBox
+
+fromVector :: Vector -> Lego
+fromVector v = head $ filter ((v==) . legoBox) [minBound .. maxBound]
+
+rotateLego :: Lego -> Lego
+rotateLego = fromVector . rotateVector . toVector
+    where rotateVector (Vector (x,y,z)) = Vector (y,x,z)
 
 minusOne :: Vector -> Vector
 minusOne (Vector (x,y,z)) = Vector (x-1,y-1,z-1)
@@ -148,13 +174,14 @@ legoProblem :: Problem P M World
 legoProblem =
     mkProblem {
          starts      = [ initialWorld ]
-        ,checkGoal   = Identity . allOnFloor
+        ,checkGoal   = return . allOnFloor
         ,showElem    = topview -- show
         ,eqElem      = (==)
 
         ,actions     = [
-               mkAction "Pick" (Identity . pick)
-              ,mkAction "Put"  (Identity . put)
+               mkAction "Pick"   (return . pick)
+              ,mkAction "Put"    (return . put)
+              ,mkAction "Rotate" (return . rotate)
          ]
         
         ,heuristic   = Nothing
@@ -175,6 +202,13 @@ pick :: World -> [World]
 pick (World Nothing size s) = [ World (Just l) size s' | (l,s') <- pickable s ]
 pick _ = []
 
+rotate :: World -> [World]
+rotate (World (Just l) size s) = let l' = rotateLego l
+                                 in  if l' /= l
+                                         then [ World (Just l') size s ]
+                                         else []
+rotate _ = []
+
 put :: World -> [World]
 put (World (Just l) size s) =
     [ w | s' <- putable size l s, let w = World Nothing size s', isValidWorld w]
@@ -191,10 +225,9 @@ putable size l s = [ S.insert l' s | l' <- newPositions ]
     where
         newPositions = filter eligible $ mkLego <$> range <*> range <*> range  
         range = [0..(size-1)]
-        eligible = ((&&) .: (&&)) <$> collisionFree s <*> isLoose s <*> inWorld size
+        eligible = (&&) .: (&&) <$> collisionFree s <*> isLoose s <*> inWorld size
         mkLego :: Int -> Int -> Int -> Posed Lego
         mkLego = mkPositionedLego l
-
 
 
 inWorld :: Size -> Posed Lego -> Bool
@@ -217,10 +250,12 @@ curry3 f = \a b c -> f(a,b,c)
 
 -- applicative chaining of logical operations is quite useful!
 isLoose :: Legos -> Posed Lego -> Bool
-isLoose s = (||) <$> looseOnFloor <*> looseOnLego
-    where
-        looseOnLego = (&&) <$> not . onFloor <*> (xor <$> topFree s <*> botFree s)
-        looseOnFloor = (&&) <$> onFloor <*> topFree s
+isLoose s = (||) .: (||) <$> looseOnFloor s <*> looseOverLego s <*> looseUnderLego s
+
+looseOverLego, looseUnderLego, looseOnFloor :: Legos -> Posed Lego -> Bool
+looseOverLego s = (&&) <$> not . onFloor <*> topFree s
+looseUnderLego s = (&&) <$> not . onFloor <*> botFree s
+looseOnFloor s = (&&) <$> onFloor <*> topFree s
 
 xor a = (||) <$> ((a &&) . not) <*> (not a &&)
 
@@ -360,7 +395,6 @@ mkPositionedLego l x y z =
 -- where every lego points to its immediate lower ones.
 -- this makes finding free legos much easier
 
-
 simpleWorld = 
     let size = 6
     in  World (Just L2x2x2) size
@@ -384,7 +418,7 @@ showSample = sample' (arbitrary :: Gen World) >>= mapM_ showTop
 instance Arbitrary World where
     arbitrary = do
             size           <- choose (2,8)
-            (World _ _ s) <- repeatAWhile 5 (World Nothing size S.empty)
+            (World _ _ s)  <- repeatAWhile 5 (World Nothing size S.empty)
             ml             <- arbitrary :: Gen (Maybe Lego)
             return (World ml size s)
         where
@@ -396,30 +430,38 @@ instance Arbitrary World where
                     let stop = minBound + (round $ (0.5 :: Double) * fromIntegral (maxBound - minBound :: Int) )
                     if n == 0 || i < stop || null xs then return w else elements xs >>= repeatAWhile (n-1)
 
-_expand w = put w ++ pick w
+-- TODO: write shrink.
+
+nonEmpty = not . null
+
+isHolding = isJust . holding
+notHolding = (Nothing==) . holding
+
+doStuff w = put w ++ pick w ++ rotate w
 
 -- the the number of legos doesn't change on expansions
-prop_PutPickCount = \w -> and $ map ((==EQ) . comparing count w) (_expand w)
+prop_ActionCount = \w -> and $ map ((==EQ) . comparing count w) (doStuff w)
 
 -- all expansions should be valid Worlds
-prop_ValidGen = all isValidWorld . _expand
+prop_ValidGen = all isValidWorld . doStuff
 
--- In a World with exactly one Lego, that Lego is always pickable.
-prop_SinglePickable = \w -> ((1==) . S.size . legos) w ==> isLoose (legos w) (S.elemAt 0 $ legos w)
+-- In a World with exactly one Lego and a free hand, that Lego is always pickable.
+prop_SinglePickable = \w ->
+    ((0<) . S.size . legos) w 
+    && notHolding w
+    ==> nonEmpty (pick w)
 
--- After Puting a Lego, at least one Lego is Loose.
-prop_LooseAfterPut =
+-- After Puting a Lego, at least one Lego is pickable
+prop_PickableAfterPut =
     \w -> let xs = put w
-          in  all (\w' -> let s = legos w' in not . S.null . S.filter (isLoose s) $ s) xs
+          in  if nonEmpty xs
+                  then nonEmpty . concatMap pick $ xs
+                  else True
 
 -- consecutive put/pick actions may reverse each other.
 prop_PutPickMayReverse = \w ->
-    let as = _expand w
-        xs = concatMap _expand as
-    in  not (null xs) ==> w `elem` xs
-
--- how does the number of loose legos change on put/pick?
--- prop_PutPickLoose = \w -> and $ map ((==EQ) . comparing (S.size . legos) w) (_expand w)
+    let xs = concatMap doStuff . doStuff $ w
+    in  nonEmpty xs ==> w `elem` xs
 
 runTests = $quickCheckAll
 rt = runTests

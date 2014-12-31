@@ -74,13 +74,13 @@ main = do
     showTop (head zs)
     linebreak
     
-    let p = search legoProblem
-    runEffect $ p >-> P.map getPath >->P.print
+    let msol = runIdentity $ search legoProblem
+    putStrLn "Calculating..."
+    maybe (putStrLn "No solution found.") (printSolution legoProblem) msol
     
-    
-    --putStrLn "Running Tests"
-    --void runTests
-    return ()
+    linebreak
+    putStrLn "Running Tests"
+    runTests >>= putStrLn
 
 showTop :: World -> IO ()
 showTop = putStrLn . topview
@@ -89,7 +89,7 @@ type P = SPath
 type Size = Int
 type Pos = (Int,Int,Int)
 type Legos = S.Set (Posed Lego)
-type M = IO
+type M = Identity
 type Box = (Pos, Pos) -- a box anywhere
 newtype Vector = Vector Pos deriving (Eq, Ord, Show, Read) -- a Vector/Box from the origin
 -- a small typeclass to refactor a few functions with similar usages
@@ -174,8 +174,12 @@ legoProblem :: Problem P M World
 legoProblem =
     mkProblem {
          starts      = [ initialWorld ]
-        ,checkGoal   = return . allOnFloor
-        ,showElem    = topview -- show
+        ,checkGoal   = \w -> return
+                                $ (&&) <$> notHolding
+                                       <*> (1==) . S.size . S.filter onFloor . legos
+                                $ w
+                       -- the goal is to put all legos on a single one.
+        ,showElem    = ('\n':) . show
         ,eqElem      = (==)
 
         ,actions     = [
@@ -188,9 +192,6 @@ legoProblem =
         ,strategy    = Breadth
         ,ordering    = Just compare
     }
-
-allOnFloor :: World -> Bool
-allOnFloor = all onFloor . S.toList . legos
 
 onFloor :: Posed Lego -> Bool
 onFloor = uncurry3 (\x y z -> z == 0) . getOrigin
@@ -466,4 +467,12 @@ prop_PutPickMayReverse = \w ->
 runTests = $quickCheckAll
 rt = runTests
 
+{-
+Invalid Generation:
+World (Nothing) 7 (S.fromList [PS {getLego = L4x2x2, getOrigin = (0,1,0), getEdge
+= (3,2,1)},PS {getLego = L6x2x2, getOrigin = (0,2,4), getEdge = (5,3,5)},PS {ge
+Lego = L2x4x2, getOrigin = (0,3,2), getEdge = (1,6,3)},PS {getLego = L2x6x2, ge
+Origin = (2,1,2), getEdge = (3,6,3)},PS {getLego = L2x4x2, getOrigin = (4,2,0),
+getEdge = (5,5,1)}])
+-}
 

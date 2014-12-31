@@ -8,13 +8,12 @@ module Search (
     where
 
 -- TODO: Use Data.Sequence instead of Lists?
--- TODO: Profiling first!
--- TODO: Tests? xD
--- TODO: mkAction mit sprechenden Strings statt Zahlen
-
--- TODO: Search als Transformer um effekte in expand zu intigrieren
-
+-- DONE: Profiling first!
+-- DONE? Tests? xD
+-- DONE: Search als Transformer um effekte in expand zu intigrieren
 -- TODO: Transformer schöner modellieren und intigrieren?
+
+-- TODO: mkAction mit sprechenden Strings statt Zahlen
 
 -- Proper Project structure: https://en.wikibooks.org/wiki/Haskell/Packaging
 
@@ -36,7 +35,9 @@ import Utils
 import Strategies
 
 import Control.Monad
+import Data.Maybe
 import Pipes
+import qualified Pipes.Prelude as P
 
 -- SearchT
 -- p implements the search tree data structure (can be cahnged for efficiency etc...)
@@ -56,9 +57,13 @@ newtype SearchT p m a r = SearchT {
 -- SearchT could be a monad. That could mean
 -- doing a search in the expansion of an outer search. (which isnt far fetched)
 
+-- retrieve a single solution
+search :: (PathT p a, Monad m) => Problem p m a -> m (Maybe (Solution a))
+search p = P.head $ searchAll p
 
-search :: (PathT p a, Monad m) => Problem p m a -> Producer (Solution a) m ()
-search p = search' p startNodes
+-- retrieve all solutions
+searchAll :: (PathT p a, Monad m) => Problem p m a -> Producer (Solution a) m ()
+searchAll p = search' p startNodes
     where startNodes = [ mkStartPath p x | x <- starts p ]
 
 search' :: (PathT p a, Monad m) => Problem p m a -> [p a] -> Producer (Solution a) m ()

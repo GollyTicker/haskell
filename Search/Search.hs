@@ -34,6 +34,7 @@ import Types
 import Utils
 import Strategies
 
+import Debug.Trace
 import Control.Monad
 import Data.Maybe
 import Pipes

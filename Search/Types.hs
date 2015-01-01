@@ -16,7 +16,7 @@ data Strategy a =
     Depth
     | Breadth
     | A
---  | OptimistcClimbing
+    | Optimistic
 --  | Custom (StrategyF a)
 
 type StrategyF p a = [p a] -> [p a] -> [p a]

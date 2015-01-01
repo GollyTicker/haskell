@@ -74,13 +74,13 @@ main = do
     showTop (head zs)
     linebreak
     
-    let msol = runIdentity $ search legoProblem
+    let sol = runIdentity $ search legoProblem
     putStrLn "Calculating..."
-    maybe (putStrLn "No solution found.") (printSolution legoProblem) msol
+    maybe (putStrLn "No solution found.") (printSolution legoProblem) sol
     
-    linebreak
-    putStrLn "Running Tests"
-    runTests >>= putStrLn
+    --linebreak
+    --putStrLn "Running Tests"
+    --runTests >>= print
 
 showTop :: World -> IO ()
 showTop = putStrLn . topview
@@ -178,7 +178,7 @@ legoProblem =
                                 $ (&&) <$> notHolding
                                        <*> (1==) . S.size . S.filter onFloor . legos
                                 $ w
-                       -- the goal is to put all legos on a single one.
+                       -- the goal is to put all legos on a single lego.
         ,showElem    = ('\n':) . show
         ,eqElem      = (==)
 
@@ -188,7 +188,7 @@ legoProblem =
               ,mkAction "Rotate" (return . rotate)
          ]
         
-        ,heuristic   = Nothing
+        ,heuristic   = Just $ fromIntegral . (+100) . negate . S.size . S.filter onFloor . legos
         ,strategy    = Breadth
         ,ordering    = Just compare
     }
@@ -200,7 +200,7 @@ onFloor = uncurry3 (\x y z -> z == 0) . getOrigin
 -- voneinander definieren...
 
 pick :: World -> [World]
-pick (World Nothing size s) = [ World (Just l) size s' | (l,s') <- pickable s ]
+pick (World Nothing size s) = filter isValidWorld [ World (Just l) size s' | (l,s') <- pickable s ]
 pick _ = []
 
 rotate :: World -> [World]
@@ -250,12 +250,17 @@ curry3 :: ((a,b,c) -> d) -> a -> b -> c -> d
 curry3 f = \a b c -> f(a,b,c)
 
 -- applicative chaining of logical operations is quite useful!
+
+-- problem: T shape legos formation may be broken and create an invalid world.
+-- this is a non-trivial thing because many different counter-examples
+-- for any fix of this bug can be thought of.
+-- Therefore, the picks are simply filtered by validity in (pick w)
 isLoose :: Legos -> Posed Lego -> Bool
-isLoose s = (||) .: (||) <$> looseOnFloor s <*> looseOverLego s <*> looseUnderLego s
+isLoose s = (||) <$> looseOnFloor s <*> (xor <$> looseOverLego s <*> looseUnderLego s)
 
 looseOverLego, looseUnderLego, looseOnFloor :: Legos -> Posed Lego -> Bool
-looseOverLego s = (&&) <$> not . onFloor <*> topFree s
-looseUnderLego s = (&&) <$> not . onFloor <*> botFree s
+looseOverLego s = (&&) <$> not . onFloor <*> botFree s
+looseUnderLego s = (&&) <$> not . onFloor <*> topFree s
 looseOnFloor s = (&&) <$> onFloor <*> topFree s
 
 xor a = (||) <$> ((a &&) . not) <*> (not a &&)
@@ -430,6 +435,11 @@ instance Arbitrary World where
                         xs = put w
                     let stop = minBound + (round $ (0.5 :: Double) * fromIntegral (maxBound - minBound :: Int) )
                     if n == 0 || i < stop || null xs then return w else elements xs >>= repeatAWhile (n-1)
+    
+shrink' w@(World ml s ls)
+    | isHolding w         = let w' = (World Nothing s ls) in w':shrink' w'
+    | nonEmpty (rotate w) = rotate w ++ concatMap shrink' (rotate w)
+    | otherwise           = nub $ concatMap shrink' (pick w)
 
 -- TODO: write shrink.
 
@@ -443,8 +453,24 @@ doStuff w = put w ++ pick w ++ rotate w
 -- the the number of legos doesn't change on expansions
 prop_ActionCount = \w -> and $ map ((==EQ) . comparing count w) (doStuff w)
 
+-- all generations should be valid Worlds
+prop_ValidGenerations = isValidWorld
+
+-- all shrinks should be valid Worlds
+prop_ValidShrinks = all isValidWorld . shrink'
+
+-- all picks should be valid Worlds
+prop_ValidPicks w = notHolding w ==> all isValidWorld (pick w)
+
+-- all puts should be valid Worlds
+prop_ValidPuts w = isHolding w ==> all isValidWorld (put w)
+
+-- all rotations should be valid Worlds
+prop_ValidRotations w = let rs = rotate w 
+                     in  nonEmpty rs ==> all isValidWorld rs
+
 -- all expansions should be valid Worlds
-prop_ValidGen = all isValidWorld . doStuff
+prop_ValidExpansions = all isValidWorld . doStuff
 
 -- In a World with exactly one Lego and a free hand, that Lego is always pickable.
 prop_SinglePickable = \w ->
@@ -467,12 +493,4 @@ prop_PutPickMayReverse = \w ->
 runTests = $quickCheckAll
 rt = runTests
 
-{-
-Invalid Generation:
-World (Nothing) 7 (S.fromList [PS {getLego = L4x2x2, getOrigin = (0,1,0), getEdge
-= (3,2,1)},PS {getLego = L6x2x2, getOrigin = (0,2,4), getEdge = (5,3,5)},PS {ge
-Lego = L2x4x2, getOrigin = (0,3,2), getEdge = (1,6,3)},PS {getLego = L2x6x2, ge
-Origin = (2,1,2), getEdge = (3,6,3)},PS {getLego = L2x4x2, getOrigin = (4,2,0),
-getEdge = (5,5,1)}])
--}
 

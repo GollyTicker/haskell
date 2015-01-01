@@ -79,8 +79,9 @@ search' pr ps' = do
                                 search' pr all
 
 stat :: (PathT p a, Monad m) => Problem p m a -> [p a] -> m (Status p a)
-stat pr ps'@(p:ps) =
+stat pr ps' =
     let tip = first p
+        (p:ps) = ps'
     in if null ps' then return Sackgasse
        else do
               isGoal <- pr `checkGoalNode` tip

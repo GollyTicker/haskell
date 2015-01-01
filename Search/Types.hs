@@ -137,15 +137,19 @@ instance PathT SPath a where
                             Start -> []
                             AA _ _ _ n' -> toPath n'
 
-    evalPathWith f (SPath n xs) = -- ( (Node x aa _) :ns)
-        let hvalue = f (getElem n) (fromIntegral (S.size xs - 1))
-            new = n { getHvalue = Just hvalue }
-        in  SPath new (replace n new xs)
+    evalPathWith f s@(SPath n xs)
+        | evaled s = s
+        | otherwise = 
+            let hvalue = f (getElem n) (fromIntegral (S.size xs - 1))
+                new = n { getHvalue = Just hvalue }
+            in  SPath new (replace n new xs)
         
     contains pr ns n = case ordering pr of
                         Nothing -> missingOrderingError
                         Just _  -> S.member n (getSet ns)
 
+evaled :: PathT p a => p a -> Bool
+evaled = isJust . getHvalue . first
 
 missingOrderingError = error "Set based approach requires mkProblem{ordering = ...}"
 
@@ -160,9 +164,11 @@ instance PathT LPath a where
             err = error $ "This is a bug. Ordering in Node should not be accessed in (PathT Path a)"
 
     toSolution = getLPath
-    evalPathWith f (LPath (node:ns) ) =
-        let hvalue = f (getElem node) (fromIntegral (length ns))
-        in  LPath (node {getHvalue = Just hvalue} :ns)
+    evalPathWith f p@(LPath (node:ns) )
+        | evaled p = p
+        | otherwise = 
+            let hvalue = f (getElem node) (fromIntegral (length ns))
+            in  LPath (node {getHvalue = Just hvalue} :ns)
     contains pr ns n = any (\n' -> (getElem n) `eq` (getElem n')) . getLPath $ ns
         where eq = eqElem pr
 

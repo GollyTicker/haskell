@@ -436,12 +436,12 @@ instance Arbitrary World where
                     let stop = minBound + (round $ (0.5 :: Double) * fromIntegral (maxBound - minBound :: Int) )
                     if n == 0 || i < stop || null xs then return w else elements xs >>= repeatAWhile (n-1)
     
+    shrink = shrink'
+    
 shrink' w@(World ml s ls)
     | isHolding w         = let w' = (World Nothing s ls) in w':shrink' w'
     | nonEmpty (rotate w) = rotate w ++ concatMap shrink' (rotate w)
     | otherwise           = nub $ concatMap shrink' (pick w)
-
--- TODO: write shrink.
 
 nonEmpty = not . null
 

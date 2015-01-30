@@ -39,7 +39,7 @@ a :: forall p m a. PathT p a => Problem p m a -> Heuristic a -> StrategyF p a
 a pr h nps ops =
     sortBy (comparing (fromJust . getHvalue . first))
     . map (evalPathWith (\x rest -> rest + h x))
-    $ nps ++ ops
+    $ ops ++ nps
 
 optimisticBestSearch :: PathT p a => Problem p m a -> Heuristic a -> StrategyF p a
 optimisticBestSearch pr h nps _ops = 

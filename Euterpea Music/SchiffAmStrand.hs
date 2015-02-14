@@ -1,4 +1,5 @@
 
+
 import MyEuterpea
 
 main = sas
@@ -27,6 +28,7 @@ lead = line $ zipApply rythmSas [
         g 4, f  4, g 4,
         f 4
        ]
+;
 firstChore = line $ zipApply rythmSas [
         d 4,
         a 4,  a 4, a 4, a 4,
@@ -35,7 +37,30 @@ firstChore = line $ zipApply rythmSas [
         bf 4
        ]
 ;
-sasComposition = lead :+: firstChore
+
+thirdChore = line $ zipApply rythmSas [
+        d 4,
+        a 4,  a 4, a 4, a 4,
+        a 4,  a 4, d 5,
+        c 5, bf 4, a 4,
+        fs 4
+       ]
+;
+
+firstOne = line [
+          lead
+        , firstChore
+        , lead
+        , thirdChore
+    ]
+;
+
+secondOne = transpose (-2) firstOne
+
+thirdOne = transpose 1 firstOne
+
+sasComposition = firstOne :+: secondOne -- :+: thirdOne
+; -- feels like infinite sleeping music....
 
 ins = Clarinet
 sas = play

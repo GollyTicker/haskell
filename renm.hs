@@ -10,7 +10,7 @@
     one of more digits inbetween (match called a) into files "bla" + a + "blub.txt".
     
   Note:
-    Finds and searches only through the files 
+    Finds and searches only through the files in the current directory
   
 -}
 
@@ -27,7 +27,7 @@ import Data.Functor.Identity
 -- Tutorial: https://hackage.haskell.org/package/pipes-4.3.10/docs/Pipes-Tutorial.html
 
 import System.Directory -- package directory
-import System.Console.ArgParser -- package argparser
+import System.Console.ArgParser hiding (Parser)-- package argparser
 
 data A = A String String deriving (Show)
 
@@ -63,76 +63,93 @@ pipeline pat repl = forever $ do
 
 main = do
   let prog (A s1 s2) = do
+        -- TODO: check for correctness of arguments. parse (parseStrWith bodyInnerExp) "pattern" s1
         xs <- listDirectory "."
         runEffect $ each xs >-> pipeline s1 s2
   {-withParseResult argParser-}
   prog (A "bla.txt" "blubb.txt")
 ;
 
-txt :: ParsecT String u Identity String
-txt = many (noneOf "[]")
-
-body :: ParsecT String u Identity (String,Prs u)
-body = do char '['
-          var <- many (noneOf "|")
-          char '|'
-          rexp <- txt
-          char ']'
-          return (var,rexp)
-;
-
-type Prs u = String -- ParsecT String u Identity String
-{-
-type PrsParser u = ParsecT String u Identity (Prs u)
+-- In ghci> prog (A "bla.txt" "blubb.txt")
 
 
-test prsexp prsstr = fmap (\p -> parse p "inner" prsstr) $ parse prs "outer" prsexp
+{- === Parse pattern and out-filenames === -}
+type Parser a = ParsecT String () Identity a
+type Var = String
+txt :: Parser String
+txt = many (noneOf "[")
+
+bodyInnerExp :: Parser (Var,Prs)
+bodyInnerExp =
+  do char '['
+     var <- many letter
+     char '|'
+     exp <- prs
+     char ']'
+     return (var,exp)
+
+bodyVar :: Parser Var
+bodyVar = between (string "[") (string "]") (many letter)
+
+parseStrWith :: Parser a -> Parser [Either String a]
+parseStrWith p = chainl
+  ((:[]) . Left <$> txt)
+  (do cont <- p;
+      return (\xs1 xs2 -> xs1 ++ [Right cont] ++ xs2))
+  []
+
+testPrs prsexp prsstr =
+  (\p -> parse p "inner" prsstr) <$> parse prs "outer" prsexp
+
+tryMeOut :: IO ()
+tryMeOut = do
+  let f e s = do
+        putStrLn $ concat ["Running expr. ",e," on ",s]
+        print $ testPrs e s 
+      exp1 = "(c+d+)+"
+      str1 = "ab12cd34ef56blabla423423"
+      exp2 = "(cd*c)+"
+      str2 = "a1ab2323be12312e"
+  f exp1 str1
+  f exp2 str2
+
+
+
+{- === Inner Expression Parser === -}
+type Prs = Parser String
+type PrsParser = Parser Prs
+prs :: PrsParser
+prs =
+  let withLA :: PrsParser
+      withLA  = atomic "d" digit
+                <|> atomic "c" letter
+                <|> atomic "a" alphaNum
+                <|> between (string "(") (string ")") prs
+      
+      withMany :: PrsParser -> PrsParser
+      withMany pp =
+        do p <- pp
+           choice [
+             string "+" >> return (concat <$> many1 p)
+            ,string "*" >> return (concat <$> many  p)
+            ,return p
+            ]
   
-prs :: PrsParser u
-prs = prsAtomic 'd' digit
-  <|> prsAtomic 'c' letter
-  <|> prsAtomic 'a' alphaNum
-  <|> prsMany1 prs
-  <|> prsBracket prs
+  in  do ps <- many (withMany withLA)
+         return $ concat <$> sequence ps
 
-prsBracket :: PrsParser u -> PrsParser u
-prsBracket pp = do
-  char '('
-  p <- pp
-  char ')'
-  return p
-
-prsMany1 :: PrsParser u -> PrsParser u
-prsMany1 pp =
-  do char '+'
-     p <- pp
-     return (fmap concat $ many1 p)
-;
-
-prsAtomic :: Char -> ParsecT String u Identity Char -> PrsParser u
-prsAtomic c p = do char c; return (fmap (:[]) p)
+atomic :: String -> Parser Char -> PrsParser
+atomic s p = string s >> return ((:[]) <$> p)
 
 -- .+
--- .* (not implemented)
+-- .*
 -- d for digits
 -- c for characters
 -- a for alphanumeric
 {-
-srexp =
-    "d"
-  | "c"
-  | "a"
-  | +srxp
-  | "(" srexp ")"
-  | srxp srxp -- NOT IMPLEMENTED. TODO
--}
+exp = many many
+many = base "+" | base "*"
+base = "d" | "c" | "a" | "(" exp ")"
 
+TODO: add useful capabilities like a real reg-exp parser does
 -}
-bla :: ParsecT String u Identity [Either String (String,Prs u)]
-bla = chainl
-  (fmap ((:[]) . Left) txt)
-  (do cont <- body;
-      return (\xs1 xs2 -> xs1 ++ [Right cont] ++ xs2))
-  [Left "noOcc"]
-
-trythisout = parseTest bla "asda[s|asdsa]ds[ads|esrfdsd]asd"

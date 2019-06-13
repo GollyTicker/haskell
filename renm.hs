@@ -1,17 +1,36 @@
 {-
+    
     renm
   
-  Rename filenames by pattern matching for a string and replacing it one by one.
+  Rename filenames. Match parts of filenames and refer to
+  the matched results directly when creating new filenames.
+  
+  Usage form:
+            $ renm <filename matcher> <filename creator>
   
   Usage example:
-    $ renm "abc[a|d+]def.txt" "bla[a]blubb.txt"
+            $ renm "abc[a|d+]def.txt" "bla[a]blubb.txt"
+                        ^  ^               ^
+                        |  |               |
+         matched variable  |               refer to match via variable
+                           |
+                           pattern matched against
     
-    Renames all files starting with "abc", ending with "def.txt" with
-    one of more digits inbetween (match called a) into files "bla" + a + "blub.txt".
-    
-  Note:
-    Finds and searches only through the files in the current directory
+    Renames all files
+      starting with "abc"
+      with one or more digits called refered to by <a>
+      and ending with "def.txt"
+    into files starting with "bla"
+      with <a> inbetween
+      and ending with "blub.txt".
   
+  Note:
+    Searches and replaces only through the files in the current directory.
+  
+  TODO:
+    . Illustrate with many concrete examples
+    . Describe inner expression matcher language.
+    . find concrete use cases and improve towards usability
 -}
 
 import Control.Monad
@@ -28,6 +47,9 @@ import Data.Functor.Identity
 
 import System.Directory -- package directory
 import System.Console.ArgParser hiding (Parser)-- package argparser
+
+import qualified Data.Map as M
+import qualified Data.List as L
 
 data A = A String String deriving (Show)
 
@@ -46,13 +68,13 @@ fileExists nm = do
   b <- lift $ doesFileExist nm
   Select $ when b (yield nm)
 
-replace :: String -> String -> String -> (String,String)
+replace :: Matcher -> Creator -> String -> (String,String)
 replace pat repl str = (str,str)
 
-matches :: String -> String -> Bool
+matches :: Matcher -> String -> Bool
 matches pat str = True
 
-pipeline :: String -> String -> Consumer String IO ()
+pipeline :: Matcher -> Creator -> Consumer String IO ()
 pipeline pat repl = forever $ do
   nm <- await
   every (fileExists nm)
@@ -60,20 +82,41 @@ pipeline pat repl = forever $ do
     >-> P.map (replace pat repl)
     >-> renmFile
 ;
+-- Perhaps count renamed files and report back to user?
 
-main = do
-  let prog (A s1 s2) = do
-        -- TODO: check for correctness of arguments. parse (parseStrWith bodyInnerExp) "pattern" s1
-        xs <- listDirectory "."
-        runEffect $ each xs >-> pipeline s1 s2
-  {-withParseResult argParser-}
-  prog (A "bla.txt" "blubb.txt")
-;
+parsedArgs :: String -> String -> Either ParseError (Matcher,Creator)
+parsedArgs s1 s2 = 
+         (,) <$> parse matcher ("matcher <" ++ s1 ++ ">") s1
+             <*> parse creator ("creator <" ++ s2 ++ ">") s2
 
--- In ghci> prog (A "bla.txt" "blubb.txt")
+main :: IO ()
+main = withParseResult argParser prog
+
+prog :: A -> IO ()
+prog (A s1 s2) =
+  case parsedArgs s1 s2 of
+    Right (pat,out) -> do
+      -- TODO. check that all variables in creator are created in matcher
+      putStrLn $ concat ["Understood matcher <",s1,"> and creator <",s2,">."]
+      xs <- listDirectory "."
+      runEffect $ each xs >-> pipeline pat out
+    Left err -> do
+      putStrLn ("Is your " ++ (sourceName $ errorPos err) ++ " correctly formed?")
+      putStrLn ""
+      putStrLn $ indent 2 $ show err
+      putStrLn ""
+      putStrLn "Nothing was done."
+
+indent n = unlines . map ("  " ++ ) . lines
+
+-- for ghci>
+runProg1,runProg2 :: IO ()
+runProg1 = prog (A "bla.txt" "blubb.txt")
+runProg2 = prog (A "bla[a|bad-expression].txt" "blubb[a].txt")
+runProg3 = prog (A "[a|a][a|a]" "a")
 
 
-{- === Parse pattern and out-filenames === -}
+{- === Parse matcher and out-filenames === -}
 type Parser a = ParsecT String () Identity a
 type Var = String
 txt :: Parser String
@@ -91,15 +134,43 @@ bodyInnerExp =
 bodyVar :: Parser Var
 bodyVar = between (string "[") (string "]") (many letter)
 
-parseStrWith :: Parser a -> Parser [Either String a]
-parseStrWith p = chainl
-  ((:[]) . Left <$> txt)
-  (do cont <- p;
-      return (\xs1 xs2 -> xs1 ++ [Right cont] ++ xs2))
-  []
+type Env = M.Map Var String
+type Creator = ([Var],Env -> String)
+type Matcher = ([Var],Parser Env)
+
+creator :: Parser Creator
+creator =
+  chainl
+    ((\x -> ([],const x)) <$> txt)
+    (do v <- bodyVar
+        return (\lt rt -> mconcat [lt, ([v],\env -> env M.! v), rt]))
+    ([],const "") -- TODO: is this line correct?
+
+-- could get rid of Env here and directly return another
+-- Parser which itself returns a String
+matcher :: Parser Matcher
+matcher = do
+  x <- chainl
+    (const ([],return M.empty) <$> txt)
+    (do (v,p) <- bodyInnerExp
+        return
+          (\lt rt -> -- Could this be more concise using monoid and Alternative?
+            (mconcat [fst lt,[v],fst rt], (\l s r -> mconcat [l,M.singleton v s,r]) <$> snd lt <*> p <*> snd rt)
+          )
+    )
+    ([],return M.empty)
+  let nonUniqueVars = fst x L.\\ (L.nub (fst x))
+  when (not . null $ nonUniqueVars)
+    $ parserFail $ "Duplicate variable names "
+             ++ L.intercalate "," nonUniqueVars
+             ++ ". Please give each expression an unique name."
+  return x
+-- Error condition: multiple variables may clash.
+-- fixed by checking it after parsing.
 
 testPrs prsexp prsstr =
-  (\p -> parse p "inner" prsstr) <$> parse prs "outer" prsexp
+  (\p -> parse p "inner" prsstr)
+  <$> parse prs "outer" prsexp
 
 tryMeOut :: IO ()
 tryMeOut = do
@@ -147,7 +218,7 @@ atomic s p = string s >> return ((:[]) <$> p)
 -- c for characters
 -- a for alphanumeric
 {-
-exp = many many
+exp = many* -- means zero or more times
 many = base "+" | base "*"
 base = "d" | "c" | "a" | "(" exp ")"
 

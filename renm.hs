@@ -85,9 +85,10 @@ pipeline pat repl = forever $ do
 -- Perhaps count renamed files and report back to user?
 
 parsedArgs :: String -> String -> Either ParseError (Matcher,Creator)
-parsedArgs s1 s2 = 
-         (,) <$> parse matcher ("matcher <" ++ s1 ++ ">") s1
-             <*> parse creator ("creator <" ++ s2 ++ ">") s2
+parsedArgs s1 s2 = do
+  mat@(vars,_) <- parse matcher ("matcher <" ++ s1 ++ ">") s1
+  crt <- parse (creator vars) ("creator <" ++ s2 ++ ">") s2
+  return (mat,crt)
 
 main :: IO ()
 main = withParseResult argParser prog
@@ -96,7 +97,6 @@ prog :: A -> IO ()
 prog (A s1 s2) =
   case parsedArgs s1 s2 of
     Right (pat,out) -> do
-      -- TODO. check that all variables in creator are created in matcher
       putStrLn $ concat ["Understood matcher <",s1,"> and creator <",s2,">."]
       xs <- listDirectory "."
       runEffect $ each xs >-> pipeline pat out
@@ -104,16 +104,21 @@ prog (A s1 s2) =
       putStrLn ("Is your " ++ (sourceName $ errorPos err) ++ " correctly formed?")
       putStrLn ""
       putStrLn $ indent 2 $ show err
-      putStrLn ""
-      putStrLn "Nothing was done."
+      putStrLn "Nothing was renamed."
 
 indent n = unlines . map ("  " ++ ) . lines
 
 -- for ghci>
-runProg1,runProg2 :: IO ()
-runProg1 = prog (A "bla.txt" "blubb.txt")
-runProg2 = prog (A "bla[a|bad-expression].txt" "blubb[a].txt")
-runProg3 = prog (A "[a|a][a|a]" "a")
+runProgs = sequence_ progs 
+progs = [
+   prog (A "dryrun-bla.txt" "blubb.txt")
+  ,putStrLn "====="
+    >> prog (A "dryrun[a|bad-expression].txt" "blubb[a].txt")
+  ,putStrLn "====="
+    >> prog (A "dryrun[a|a][a|a]" "a")
+  ,putStrLn "====="
+    >> prog (A "dryrun[a|a]" "[b]")
+  ]
 
 
 {- === Parse matcher and out-filenames === -}
@@ -138,13 +143,20 @@ type Env = M.Map Var String
 type Creator = ([Var],Env -> String)
 type Matcher = ([Var],Parser Env)
 
-creator :: Parser Creator
-creator =
-  chainl
+creator :: [Var] -> Parser Creator
+creator availVars = do
+  x <- chainl
     ((\x -> ([],const x)) <$> txt)
     (do v <- bodyVar
         return (\lt rt -> mconcat [lt, ([v],\env -> env M.! v), rt]))
     ([],const "") -- TODO: is this line correct?
+  
+  let unknownVars = (L.nub $ fst x) L.\\ availVars
+  when (not . null $ unknownVars)
+    $ parserFail $ "Unknown variable names "
+             ++ L.intercalate "," unknownVars
+             ++ " in creator. Did you misspell a variable?"
+  return x
 
 -- could get rid of Env here and directly return another
 -- Parser which itself returns a String

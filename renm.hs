@@ -9,12 +9,12 @@
             $ renm <filename matcher> <filename creator>
   
   Usage example:
-            $ renm "abc[a|d+]def.txt" "bla[a]blubb.txt"
-                        ^  ^               ^
-                        |  |               |
-         matched variable  |               refer to match via variable
-                           |
-                           pattern matched against
+        $ renm "abc[a|d+]def.txt" "bla[a]blubb.txt"
+                    ^  ^               ^
+                    |  |               |
+     matched variable  |               refer to match via variable
+                       |
+                       pattern matcher
     
     Renames all files
       starting with "abc"
@@ -37,7 +37,7 @@ import Control.Monad
 
 import Pipes
 import qualified Pipes.Prelude as P
-import qualified Pipes.Text as Text
+import qualified Pipes.Text as Text -- TODO: change to more efficient Text?
 import qualified Pipes.Text.IO as Text
 
 import Text.Parsec
@@ -48,82 +48,142 @@ import Data.Functor.Identity
 import System.Directory -- package directory
 import System.Console.ArgParser hiding (Parser)-- package argparser
 
-import qualified Data.Map as M
+import qualified Data.Map  as M
 import qualified Data.List as L
+import Data.Either
+
+
+{- === MAIN, Argument Parsing, User Interface === -}
+
+main :: IO ()
+main = withParseResult argParser prog
 
 data A = A String String deriving (Show)
-
 argParser :: ParserSpec A
 argParser = A `parsedBy` reqPos "file names patten for names to be changed"
               `andBy` reqPos "resulting file names"
 
-renmFile :: Consumer (String,String) IO ()
-renmFile = do
-  (y,x) <- await
-  lift $ putStrLn $ concat ["Replace ", x, " -> ", y]
--- TOOD: actually replace
+prog :: A -> IO ()
+prog (A s1 s2) =
+  case parseMatCrt s1 s2 of
+    Right (mat,crt) -> do
+      putStrLn $ concat ["Understood matcher <",s1,"> and creator <",s2,">."]
+      xs <- listDirectory "."
+      runEffect $ each xs >-> tryReplace mat crt
+      -- Perhaps count renamed files and report back to user?
+    Left err -> do
+      putStrLn ("Is your " ++ (sourceName $ errorPos err) ++ " correctly formed?")
+      putStrLn ""
+      putStrLn $ indent 2 $ show err
+      putStrLn "Nothing was renamed."
+  where
+    indent n = unlines . map ("  " ++ ) . lines
+
+-- for ghci>
+runMe = sequence_ $ L.intersperse (putStrLn "=====") progs 
+progs = [
+   prog (A "dryrun-bla.txt" "blubb.txt")
+  ,prog (A "[a|a+].txt" "[a].txt")
+  ,prog (A "dryrun[a|bad-expression].txt" "blubb[a].txt")
+  ,prog (A "dryrun[a|a][a|a]" "a")
+  ,prog (A "dryrun[a|a]" "[b]")
+  ,print $ parse matcher "1" "a[b|c]d" >>= ((\x -> parse x "2" "axd") . snd)
+  ,print $ parse matcher "1" "a[b|c+]d" >>= ((\x -> parse x "2" "axxd") . snd)
+  ,innerExprProg
+  ]
+
+
+{- ==== Processing, Matching and Renaming ==== -}
+
+parseMatCrt :: String -> String -> Either ParseError (Matcher,Creator)
+parseMatCrt s1 s2 = do
+  mat@(vars,_) <- parse matcher ("matcher <" ++ s1 ++ ">") s1
+  crt <- parse (creator vars) ("creator <" ++ s2 ++ ">") s2
+  return (mat,crt)
+
+tryReplace :: Matcher -> Creator -> Consumer String IO ()
+tryReplace pat repl = forever $ do
+  nm <- await
+  every (fileExists nm)
+    >-> P.filter (matches pat)
+    >-> P.map (replace pat repl)
+    >-> renmFile
 
 fileExists :: String -> ListT IO String
 fileExists nm = do
   b <- lift $ doesFileExist nm
   Select $ when b (yield nm)
 
+matches :: Matcher -> String -> Bool
+matches (_,p) = isRight . parse p ""
+
 replace :: Matcher -> Creator -> String -> (String,String)
 replace pat repl str = (str,str)
 
-matches :: Matcher -> String -> Bool
-matches pat str = True
-
-pipeline :: Matcher -> Creator -> Consumer String IO ()
-pipeline pat repl = forever $ do
-  nm <- await
-  every (fileExists nm)
-    >-> P.filter (matches pat)
-    >-> P.map (replace pat repl)
-    >-> renmFile
-;
--- Perhaps count renamed files and report back to user?
-
-parsedArgs :: String -> String -> Either ParseError (Matcher,Creator)
-parsedArgs s1 s2 = do
-  mat@(vars,_) <- parse matcher ("matcher <" ++ s1 ++ ">") s1
-  crt <- parse (creator vars) ("creator <" ++ s2 ++ ">") s2
-  return (mat,crt)
-
-main :: IO ()
-main = withParseResult argParser prog
-
-prog :: A -> IO ()
-prog (A s1 s2) =
-  case parsedArgs s1 s2 of
-    Right (pat,out) -> do
-      putStrLn $ concat ["Understood matcher <",s1,"> and creator <",s2,">."]
-      xs <- listDirectory "."
-      runEffect $ each xs >-> pipeline pat out
-    Left err -> do
-      putStrLn ("Is your " ++ (sourceName $ errorPos err) ++ " correctly formed?")
-      putStrLn ""
-      putStrLn $ indent 2 $ show err
-      putStrLn "Nothing was renamed."
-
-indent n = unlines . map ("  " ++ ) . lines
-
--- for ghci>
-runProgs = sequence_ progs 
-progs = [
-   prog (A "dryrun-bla.txt" "blubb.txt")
-  ,putStrLn "====="
-    >> prog (A "dryrun[a|bad-expression].txt" "blubb[a].txt")
-  ,putStrLn "====="
-    >> prog (A "dryrun[a|a][a|a]" "a")
-  ,putStrLn "====="
-    >> prog (A "dryrun[a|a]" "[b]")
-  ]
+renmFile :: Consumer (String,String) IO ()
+renmFile = do
+  (y,x) <- await
+  lift $ putStrLn $ concat ["Replace ", x, " -> ", y]
+-- TODO: actually replace
 
 
-{- === Parse matcher and out-filenames === -}
+{- === Parse matcher and creator === -}
+type Matcher = ([Var],Parser Env)
+type Creator = ([Var],Env -> String)
+
 type Parser a = ParsecT String () Identity a
+
+type Env = M.Map Var String
 type Var = String
+
+-- CAN-DO: could get rid of Env here and directly return another
+-- Parser which itself returns a String
+matcher :: Parser Matcher
+matcher = do
+  x <- chainl
+    (do s <- txt; return ([],string s >> return M.empty))
+    (do (v,p) <- bodyInnerExp
+        return
+          (\lt rt -> -- Monoids are powerful!
+            mconcat [lt,([v],p >>= (return . M.singleton v)),rt]
+          )
+    )
+    ([],return M.empty)
+  let nonUniqueVars = fst x L.\\ (L.nub (fst x))
+  when (not . null $ nonUniqueVars)
+    $ parserFail $ "Duplicate variable names "
+             ++ L.intercalate "," nonUniqueVars
+             ++ ". Please give each expression an unique name."
+  return x
+
+-- CAN-DO:
+-- parse matcher "1" "a[b|c+]d" >>= ((\x -> parse x "2" "axd") . snd)
+-- fails with unexpected "d".
+-- => make parsing work with constraints from the end?
+-- perhaps it is natural to expect,
+-- that each internal expression ends with something that is different
+-- than the following character
+-- => we could check whether, after the inner expr.
+--    comes a matching string. but this check isnt guaranteed to
+--    hold for all cases ad a consecutive inner expression
+--    could also be the matched!
+
+
+creator :: [Var] -> Parser Creator
+creator availVars = do
+  x <- chainl
+    ((\x -> ([],const x)) <$> txt)
+    (do v <- bodyVar
+        return (\lt rt -> mconcat [lt, ([v],\env -> env M.! v), rt]))
+    ([],const "")
+  
+  let unknownVars = (L.nub $ fst x) L.\\ availVars
+  when (not . null $ unknownVars)
+    $ parserFail $ "Unknown variable names "
+             ++ L.intercalate "," unknownVars
+             ++ " in creator. Did you misspell a variable?"
+  return x
+
 txt :: Parser String
 txt = many (noneOf "[")
 
@@ -138,64 +198,6 @@ bodyInnerExp =
 
 bodyVar :: Parser Var
 bodyVar = between (string "[") (string "]") (many letter)
-
-type Env = M.Map Var String
-type Creator = ([Var],Env -> String)
-type Matcher = ([Var],Parser Env)
-
-creator :: [Var] -> Parser Creator
-creator availVars = do
-  x <- chainl
-    ((\x -> ([],const x)) <$> txt)
-    (do v <- bodyVar
-        return (\lt rt -> mconcat [lt, ([v],\env -> env M.! v), rt]))
-    ([],const "") -- TODO: is this line correct?
-  
-  let unknownVars = (L.nub $ fst x) L.\\ availVars
-  when (not . null $ unknownVars)
-    $ parserFail $ "Unknown variable names "
-             ++ L.intercalate "," unknownVars
-             ++ " in creator. Did you misspell a variable?"
-  return x
-
--- could get rid of Env here and directly return another
--- Parser which itself returns a String
-matcher :: Parser Matcher
-matcher = do
-  x <- chainl
-    (const ([],return M.empty) <$> txt)
-    (do (v,p) <- bodyInnerExp
-        return
-          (\lt rt -> -- Could this be more concise using monoid and Alternative?
-            (mconcat [fst lt,[v],fst rt], (\l s r -> mconcat [l,M.singleton v s,r]) <$> snd lt <*> p <*> snd rt)
-          )
-    )
-    ([],return M.empty)
-  let nonUniqueVars = fst x L.\\ (L.nub (fst x))
-  when (not . null $ nonUniqueVars)
-    $ parserFail $ "Duplicate variable names "
-             ++ L.intercalate "," nonUniqueVars
-             ++ ". Please give each expression an unique name."
-  return x
--- Error condition: multiple variables may clash.
--- fixed by checking it after parsing.
-
-testPrs prsexp prsstr =
-  (\p -> parse p "inner" prsstr)
-  <$> parse prs "outer" prsexp
-
-tryMeOut :: IO ()
-tryMeOut = do
-  let f e s = do
-        putStrLn $ concat ["Running expr. ",e," on ",s]
-        print $ testPrs e s 
-      exp1 = "(c+d+)+"
-      str1 = "ab12cd34ef56blabla423423"
-      exp2 = "(cd*c)+"
-      str2 = "a1ab2323be12312e"
-  f exp1 str1
-  f exp2 str2
-
 
 
 {- === Inner Expression Parser === -}
@@ -234,5 +236,25 @@ exp = many* -- means zero or more times
 many = base "+" | base "*"
 base = "d" | "c" | "a" | "(" exp ")"
 
-TODO: add useful capabilities like a real reg-exp parser does
+NEXT-DO: add useful capabilities like a real reg-exp parser does.
+e.g. ranges like 0-9 and co.
+
+TODO:
+  . add espacing for [ and ]
 -}
+
+innerExprProg :: IO ()
+innerExprProg = do
+  let f e s = do
+        putStrLn $ concat ["Running expr: ",e," on ",s]
+        print $ testPrs e s 
+      exp1 = "(c+d+)+"
+      str1 = "ab12cd34ef56blabla423423"
+      exp2 = "(cd*c)+"
+      str2 = "a1ab2323be12312e"
+  f exp1 str1
+  f exp2 str2
+
+testPrs prsexp prsstr =
+  (\p -> parse p "inner" prsstr)
+  <$> parse prs "outer" prsexp

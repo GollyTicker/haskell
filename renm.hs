@@ -34,11 +34,10 @@
 -}
 
 import Control.Monad
+import Data.Monoid
 
 import Pipes
 import qualified Pipes.Prelude as P
-import qualified Pipes.Text as Text -- TODO: change to more efficient Text?
-import qualified Pipes.Text.IO as Text
 
 import Text.Parsec
 import Data.Functor.Identity
@@ -83,7 +82,8 @@ prog (A s1 s2) =
 runMe = sequence_ $ L.intersperse (putStrLn "=====") progs 
 progs = [
    prog (A "dryrun-bla.txt" "blubb.txt")
-  ,prog (A "[a|a+].txt" "[a].txt")
+  ,prog (A "[a|a+].[b|a+]" "[a].[b]")
+  ,prog (A "[a|a+]-[b|a+]" "[a]-[b]")
   ,prog (A "dryrun[a|bad-expression].txt" "blubb[a].txt")
   ,prog (A "dryrun[a|a][a|a]" "a")
   ,prog (A "dryrun[a|a]" "[b]")
@@ -102,11 +102,10 @@ parseMatCrt s1 s2 = do
   return (mat,crt)
 
 tryReplace :: Matcher -> Creator -> Consumer String IO ()
-tryReplace pat repl = forever $ do
+tryReplace mat crt = forever $ do
   nm <- await
   every (fileExists nm)
-    >-> P.filter (matches pat)
-    >-> P.map (replace pat repl)
+    >-> matchTransform mat crt
     >-> renmFile
 
 fileExists :: String -> ListT IO String
@@ -114,15 +113,16 @@ fileExists nm = do
   b <- lift $ doesFileExist nm
   Select $ when b (yield nm)
 
-matches :: Matcher -> String -> Bool
-matches (_,p) = isRight . parse p ""
-
-replace :: Matcher -> Creator -> String -> (String,String)
-replace pat repl str = (str,str)
+matchTransform :: Monad m => Matcher -> Creator -> Pipe String (String,String) m ()
+matchTransform (_,p) (_,f) = do
+  s <- await
+  case parse p "" s of
+    Right env -> yield (s,f env)
+    Left x -> return () -- lift $ print x
 
 renmFile :: Consumer (String,String) IO ()
 renmFile = do
-  (y,x) <- await
+  (x,y) <- await
   lift $ putStrLn $ concat ["Replace ", x, " -> ", y]
 -- TODO: actually replace
 
@@ -140,7 +140,7 @@ type Var = String
 -- Parser which itself returns a String
 matcher :: Parser Matcher
 matcher = do
-  x <- chainl
+  int <- chainl
     (do s <- txt; return ([],string s >> return M.empty))
     (do (v,p) <- bodyInnerExp
         return
@@ -149,12 +149,14 @@ matcher = do
           )
     )
     ([],return M.empty)
-  let nonUniqueVars = fst x L.\\ (L.nub (fst x))
+  let res = (<* eof) <$> int  -- parser finishes on end of filename
+  eof
+  let nonUniqueVars = fst res L.\\ (L.nub (fst res))
   when (not . null $ nonUniqueVars)
     $ parserFail $ "Duplicate variable names "
              ++ L.intercalate "," nonUniqueVars
              ++ ". Please give each expression an unique name."
-  return x
+  return res
 
 -- CAN-DO:
 -- parse matcher "1" "a[b|c+]d" >>= ((\x -> parse x "2" "axd") . snd)
@@ -176,6 +178,7 @@ creator availVars = do
     (do v <- bodyVar
         return (\lt rt -> mconcat [lt, ([v],\env -> env M.! v), rt]))
     ([],const "")
+  eof
   
   let unknownVars = (L.nub $ fst x) L.\\ availVars
   when (not . null $ unknownVars)

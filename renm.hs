@@ -31,6 +31,14 @@
     . Illustrate with many concrete examples
     . Describe inner expression matcher language.
     . find concrete use cases and improve towards usability
+    . AUTO-COMPLETION / TAB-SUGGESTIONS
+    . History von kürzlichen verwendeten Matches/Creators
+    . Tests!
+    . add useful capabilities like a real reg-exp parser does.
+        e.g. ranges like 0-9 and co.
+    . add espacing for [ and ]
+    . distribute binaries on various distris. cross-compile via ghc options
+      -> make apt-get install-able
 -}
 
 import Control.Monad
@@ -50,6 +58,8 @@ import System.Console.ArgParser hiding (Parser)-- package argparser
 import qualified Data.Map  as M
 import qualified Data.List as L
 import Data.Either
+
+import Debug.Trace
 
 
 {- === MAIN, Argument Parsing, User Interface === -}
@@ -208,22 +218,29 @@ type Prs = Parser String
 type PrsParser = Parser Prs
 prs :: PrsParser
 prs =
-  let withLA :: PrsParser
-      withLA  = atomic "d" digit
+  let withLA :: PrsParser ->  PrsParser
+      withLA prec = atomic "d" digit
                 <|> atomic "c" letter
                 <|> atomic "a" alphaNum
-                <|> between (string "(") (string ")") prs
+                <|> between (string "(") (string ")") prec
       
       withMany :: PrsParser -> PrsParser
-      withMany pp =
+      withMany pp = 
         do p <- pp
-           choice [
-             string "+" >> return (concat <$> many1 p)
-            ,string "*" >> return (concat <$> many  p)
-            ,return p
-            ]
+           fs <- many (choice [
+                   string "+" *> return (fmap concat . many1)
+                  ,string "*" *> return (fmap concat . many )
+                  ,let calcInt =
+                        snd
+                        . foldr (\x (b,n) -> (b*10,b*x+n)) (1,0)
+                        . map (read . (:[]))
+                  in  do n <- calcInt <$> many1 digit
+                         return (fmap concat . count n)
+                  ])
+           
+           return $ foldr (flip (.)) id fs p
   
-  in  do ps <- many (withMany withLA)
+  in  do ps <- many (withMany (withLA prs))
          return $ concat <$> sequence ps
 
 atomic :: String -> Parser Char -> PrsParser
@@ -236,28 +253,24 @@ atomic s p = string s >> return ((:[]) <$> p)
 -- a for alphanumeric
 {-
 exp = many* -- means zero or more times
-many = base "+" | base "*"
+many = base "+" | base "*" | base number
 base = "d" | "c" | "a" | "(" exp ")"
-
-NEXT-DO: add useful capabilities like a real reg-exp parser does.
-e.g. ranges like 0-9 and co.
-
-TODO:
-  . add espacing for [ and ]
 -}
 
 innerExprProg :: IO ()
 innerExprProg = do
   let f e s = do
-        putStrLn $ concat ["Running expr: ",e," on ",s]
-        print $ testPrs e s 
-      exp1 = "(c+d+)+"
-      str1 = "ab12cd34ef56blabla423423"
-      exp2 = "(cd*c)+"
-      str2 = "a1ab2323be12312e"
-  f exp1 str1
-  f exp2 str2
+        putStrLn $ concat ["Running expr ",e," on ",s]
+        print $ testPrs e s
+        putStrLn " == "
+      exps_strs = zip
+        ["(c+d+)+","(cd*c)+"
+          ,"d3+","d3+","d3+","d3+"]
+        ["ab12cd34ef56blabla423423","a1ab2323be12312e",
+          "123","1234","12345","123456"]
+  mapM_ (uncurry f) exps_strs
 
 testPrs prsexp prsstr =
-  (\p -> parse p "inner" prsstr)
-  <$> parse prs "outer" prsexp
+  (\p -> parse (p<*eof) "inner" prsstr)
+  <$> parse (prs<*eof) "outer" prsexp
+

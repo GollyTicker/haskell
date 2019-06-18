@@ -39,6 +39,7 @@
     . add espacing for [ and ]
     . distribute binaries on various distris. cross-compile via ghc options
       -> make apt-get install-able
+    . check for 
 -}
 
 import Control.Monad
@@ -67,18 +68,23 @@ import Debug.Trace
 main :: IO ()
 main = withParseResult argParser prog
 
-data A = A String String deriving (Show)
+data A = A String String String deriving (Show)
 argParser :: ParserSpec A
 argParser = A `parsedBy` reqPos "file names patten for names to be changed"
-              `andBy` reqPos "resulting file names"
+              `andBy` reqPos "file names patten for names to be changed"
+              `andBy` reqPos "--dry for dry-run. Shows renaming without actually changing any files."
+
+isDryRun = (== "--dry")
 
 prog :: A -> IO ()
-prog (A s1 s2) =
+prog (A s1 s2 dry) = do
+  when (isDryRun dry) $
+    putStrLn "[ This is a dry run showing what would be done. Nothing will be replaced. ]"
   case parseMatCrt s1 s2 of
     Right (mat,crt) -> do
       putStrLn $ concat ["Understood matcher <",s1,"> and creator <",s2,">."]
       xs <- listDirectory "."
-      runEffect $ each xs >-> tryReplace mat crt
+      runEffect $ each xs >-> tryReplace mat crt (isDryRun dry)
       -- Perhaps count renamed files and report back to user?
     Left err -> do
       putStrLn ("Is your " ++ (sourceName $ errorPos err) ++ " correctly formed?")
@@ -91,12 +97,12 @@ prog (A s1 s2) =
 -- for ghci>
 runMe = sequence_ $ L.intersperse (putStrLn "=====") progs 
 progs = [
-   prog (A "dryrun-bla.txt" "blubb.txt")
-  ,prog (A "[a|a+].[b|a+]" "[a].[b]")
-  ,prog (A "[a|a+]-[b|a+]" "[a]-[b]")
-  ,prog (A "dryrun[a|bad-expression].txt" "blubb[a].txt")
-  ,prog (A "dryrun[a|a][a|a]" "a")
-  ,prog (A "dryrun[a|a]" "[b]")
+   prog (A "dryrun-bla.txt" "blubb.txt" "--dry")
+  ,prog (A "[a|a+].[b|a+]" "[a].[b]" "--dry")
+  ,prog (A "[a|a+]-[b|a+]" "[a]-[b]" "--dry")
+  ,prog (A "dryrun[a|bad-expression].txt" "blubb[a].txt" "--dry")
+  ,prog (A "dryrun[a|a][a|a]" "a" "--dry")
+  ,prog (A "dryrun[a|a]" "[b]" "--dry")
   ,print $ parse matcher "1" "a[b|c]d" >>= ((\x -> parse x "2" "axd") . snd)
   ,print $ parse matcher "1" "a[b|c+]d" >>= ((\x -> parse x "2" "axxd") . snd)
   ,innerExprProg
@@ -111,12 +117,12 @@ parseMatCrt s1 s2 = do
   crt <- parse (creator vars) ("creator <" ++ s2 ++ ">") s2
   return (mat,crt)
 
-tryReplace :: Matcher -> Creator -> Consumer String IO ()
-tryReplace mat crt = forever $ do
+tryReplace :: Matcher -> Creator -> Bool -> Consumer String IO ()
+tryReplace mat crt dry = forever $ do
   nm <- await
   every (fileExists nm)
     >-> matchTransform mat crt
-    >-> renmFile
+    >-> renmFile dry
 
 fileExists :: String -> ListT IO String
 fileExists nm = do
@@ -130,11 +136,11 @@ matchTransform (_,p) (_,f) = do
     Right env -> yield (s,f env)
     Left x -> return () -- lift $ print x
 
-renmFile :: Consumer (String,String) IO ()
-renmFile = do
+renmFile :: Bool -> Consumer (String,String) IO ()
+renmFile dry = do
   (x,y) <- await
-  lift $ putStrLn $ concat ["Replace ", x, " -> ", y]
--- TODO: actually replace
+  lift $ putStrLn $ concat ["Rename ",if dry then " [dry] " else " ", x, " -> ", y]
+  lift $ when (not dry) $ renameFile x y
 
 
 {- === Parse matcher and creator === -}
@@ -222,6 +228,8 @@ prs =
       withLA prec = atomic "d" digit
                 <|> atomic "c" letter
                 <|> atomic "a" alphaNum
+                <|> atomic "s" space
+                <|> atomic "f" (oneOf " -()" <|> alphaNum)
                 <|> between (string "(") (string ")") prec
       
       withMany :: PrsParser -> PrsParser
@@ -251,6 +259,9 @@ atomic s p = string s >> return ((:[]) <$> p)
 -- d for digits
 -- c for characters
 -- a for alphanumeric
+-- s for space
+-- f for filename. alphanumeric with space, dash (-),
+--       lpar and rpar (,)
 {-
 exp = many* -- means zero or more times
 many = base "+" | base "*" | base number

@@ -23,6 +23,8 @@
     into files starting with "bla"
       with <a> inbetween
       and ending with "blub.txt".
+
+    Escape [ in filesnames via \. e.g. [Hi].txt becomes "\\[Hi].txt"
   
   Note:
     Searches and replaces only through the files in the current directory.
@@ -31,15 +33,19 @@
     . Illustrate with many concrete examples
     . Describe inner expression matcher language.
     . find concrete use cases and improve towards usability
+    . introduce backtracked parsing. cases like "[a|f+]c[b|f+]b.txt"
+        on "aaccddb.txt" should return a=aac and b=dd. (Greediest match that works)
+    DONE add support for substrings. e.g. "[a|f+'hello'f+]" should match
+        "bl-ahellob-lubb". input an escaped ' via \\'
     . AUTO-COMPLETION / TAB-SUGGESTIONS
     . History von kürzlichen verwendeten Matches/Creators
-    . Tests!
+    . Add proper test suite
     . add useful capabilities like a real reg-exp parser does.
         e.g. ranges like 0-9 and co.
-    . add espacing for [ and ]
     . distribute binaries on various distris. cross-compile via ghc options
       -> make apt-get install-able
-    . check for 
+    . check for duplicates in file renamings -> show to ppl
+    DONE escaping of [ with "\\["
 -}
 
 import Control.Monad
@@ -68,23 +74,21 @@ import Debug.Trace
 main :: IO ()
 main = withParseResult argParser prog
 
-data A = A String String String deriving (Show)
+data A = A String String Bool deriving (Show)
 argParser :: ParserSpec A
-argParser = A `parsedBy` reqPos "file names patten for names to be changed"
-              `andBy` reqPos "file names patten for names to be changed"
-              `andBy` reqPos "--dry for dry-run. Shows renaming without actually changing any files."
-
-isDryRun = (== "--dry")
+argParser = A `parsedBy` reqPos "matcher" `Descr` "file-name pattern to match against"
+              `andBy` reqPos "creator" `Descr` "pattern according to which the new file-names are created"
+              `andBy` boolFlag "dry" `Descr` "dry-run. Shows renaming without actually changing any files."
 
 prog :: A -> IO ()
 prog (A s1 s2 dry) = do
-  when (isDryRun dry) $
+  when dry $
     putStrLn "[ This is a dry run showing what would be done. Nothing will be replaced. ]"
   case parseMatCrt s1 s2 of
     Right (mat,crt) -> do
-      putStrLn $ concat ["Understood matcher <",s1,"> and creator <",s2,">."]
+      putStrLn $ concat ["Understood matcher ",s1," and creator ",s2,"."]
       xs <- listDirectory "."
-      runEffect $ each xs >-> tryReplace mat crt (isDryRun dry)
+      runEffect $ each xs >-> tryReplace mat crt dry
       -- Perhaps count renamed files and report back to user?
     Left err -> do
       putStrLn ("Is your " ++ (sourceName $ errorPos err) ++ " correctly formed?")
@@ -97,12 +101,12 @@ prog (A s1 s2 dry) = do
 -- for ghci>
 runMe = sequence_ $ L.intersperse (putStrLn "=====") progs 
 progs = [
-   prog (A "dryrun-bla.txt" "blubb.txt" "--dry")
-  ,prog (A "[a|a+].[b|a+]" "[a].[b]" "--dry")
-  ,prog (A "[a|a+]-[b|a+]" "[a]-[b]" "--dry")
-  ,prog (A "dryrun[a|bad-expression].txt" "blubb[a].txt" "--dry")
-  ,prog (A "dryrun[a|a][a|a]" "a" "--dry")
-  ,prog (A "dryrun[a|a]" "[b]" "--dry")
+   prog (A "dryrun-bla.txt" "blubb.txt" True)
+  ,prog (A "[a|a+].[b|a+]" "[a].[b]" True)
+  ,prog (A "[a|a+]-[b|a+]" "[a]-[b]" True)
+  ,prog (A "dryrun[a|bad-expression].txt" "blubb[a].txt" True)
+  ,prog (A "dryrun[a|a][a|a]" "a" True)
+  ,prog (A "dryrun[a|a]" "[b]" True)
   ,print $ parse matcher "1" "a[b|c]d" >>= ((\x -> parse x "2" "axd") . snd)
   ,print $ parse matcher "1" "a[b|c+]d" >>= ((\x -> parse x "2" "axxd") . snd)
   ,innerExprProg
@@ -204,7 +208,10 @@ creator availVars = do
   return x
 
 txt :: Parser String
-txt = many (noneOf "[")
+txt = many (escape <|> noneOf "[")
+
+escape :: Parser Char
+escape = char '\\' >> anyChar
 
 bodyInnerExp :: Parser (Var,Prs)
 bodyInnerExp =
@@ -219,6 +226,10 @@ bodyVar :: Parser Var
 bodyVar = between (string "[") (string "]") (many letter)
 
 
+inExprStr :: PrsParser
+inExprStr = many (escape <|> noneOf "'")
+            >>= return . string
+
 {- === Inner Expression Parser === -}
 type Prs = Parser String
 type PrsParser = Parser Prs
@@ -229,7 +240,9 @@ prs =
                 <|> atomic "c" letter
                 <|> atomic "a" alphaNum
                 <|> atomic "s" space
+                <|> atomic "." anyChar
                 <|> atomic "f" (oneOf " -()" <|> alphaNum)
+                <|> between (string "'") (string "'") inExprStr
                 <|> between (string "(") (string ")") prec
       
       withMany :: PrsParser -> PrsParser
@@ -238,6 +251,7 @@ prs =
            fs <- many (choice [
                    string "+" *> return (fmap concat . many1)
                   ,string "*" *> return (fmap concat . many )
+                  --,string "?" *> return (fmap concat . many )
                   ,let calcInt =
                         snd
                         . foldr (\x (b,n) -> (b*10,b*x+n)) (1,0)
@@ -247,19 +261,26 @@ prs =
                   ])
            
            return $ foldr (flip (.)) id fs p
-  
-  in  do ps <- many (withMany (withLA prs))
-         return $ concat <$> sequence ps
+      seq = do ps <- many $ withMany (withLA prs)
+               return $ concat <$> sequence ps
+      --vbar = string "|" >> return (\pl pr -> try pl <|> pr)
+  in  seq -- chainl seq vbar (string "")
 
 atomic :: String -> Parser Char -> PrsParser
 atomic s p = string s >> return ((:[]) <$> p)
 
--- .+
--- .*
+
+-- full regular expressions would need Potenzmengenkonstruktion.
+-- ( )+ one of more
+-- ( )* zero or more
+-- ( )? zero or one (NOT IMPL.)
+-- ( )n repeats n times where n is a number
+-- (|) left. if not, then right.
 -- d for digits
 -- c for characters
 -- a for alphanumeric
 -- s for space
+-- . for wildcard
 -- f for filename. alphanumeric with space, dash (-),
 --       lpar and rpar (,)
 {-
